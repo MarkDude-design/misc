@@ -1,0 +1,62 @@
+BUNDLE-1/TEST
+packet_id: BUNDLE-1-TEST-001
+encoding: UTF-8
+line_endings: LF
+payload_rule: bytes strictly between boundary lines, including final LF
+destination: LOCAL-SCRATCH-ONLY (no remote post authorized)
+MANIFEST-BEGIN
+FILE | scratch/bundle-lane/01-transport-contract.md | 709 | e43e77bd73641496cda16fdeb363161070792b33385b576bbac16955ac1b160f
+FILE | scratch/bundle-lane/02-test-checklist.md | 772 | 4d315b6acced6d14dfc89e253f79e998931e0ab7274c57903d7a462266dffc7d
+FILE | scratch/bundle-lane/03-entry-point-note.md | 844 | 93ea77a78361f6754a1371ed341978edb4c11f7048e864d985a6014bd00e22ad
+MANIFEST-END
+===== BEGIN FILE: scratch/bundle-lane/01-transport-contract.md =====
+# Bundle Lane: transport contract
+
+Status: test vector only. Not approval for production publishing.
+
+A packet is a standalone text envelope with a manifest and file boundaries.
+Each payload is UTF-8 text with LF newlines and exactly one final newline.
+The SHA-256 and byte count apply to payload bytes only, not the envelope.
+
+The receiver must reject missing, duplicate, reordered, or malformed markers;
+unknown paths; byte mismatches; and checksum mismatches. A valid hash is an
+integrity check, not proof of authorship, safety, or permission to publish.
+
+A later packet must not depend on a previous packet for its own verification.
+A transport receipt records packet ID, accepted files, and any failure.
+===== END FILE: scratch/bundle-lane/01-transport-contract.md =====
+===== BEGIN FILE: scratch/bundle-lane/02-test-checklist.md =====
+# Three-file transport acceptance test
+
+Packet ID: BUNDLE-1-TEST-001
+
+1. Copy the code-block contents as plain UTF-8 text, excluding the fence.
+2. Split deterministically using exact BEGIN and END lines for each path.
+3. For every extracted payload, compute UTF-8 byte count and SHA-256.
+4. Compare both fields with the manifest. Any mismatch means STOP.
+5. Detect missing files, extra payloads, duplicate names, and unsafe paths.
+6. Write files only into a disposable local scratch directory.
+7. If a GitHub scratch push is separately authorized, refetch raw content and
+   compare bytes again before reporting success.
+8. Report: packet ID, per-file pass/fail, local hash, remote hash if pushed.
+
+No publication, credit, or authorship claim follows merely from receipt.
+===== END FILE: scratch/bundle-lane/02-test-checklist.md =====
+===== BEGIN FILE: scratch/bundle-lane/03-entry-point-note.md =====
+# Find the Entry Point: structural recognition
+
+Working hypothesis, not a conclusion: the route by which someone discovers an
+idea may differ from the route used to explain it to someone else. An intuitive
+recognition of a pattern can precede a formal definition without constituting
+full understanding of the domain.
+
+Potential test: compare a formula alone, a formula paired with a short verbal
+structural hint, a definition-first explanation, and a nonmathematical diagram.
+Score predictions on unseen examples, not just confidence or preference.
+Include tests where a tempting analogy fails: 1.3^n is still exponential,
+whereas 2^(n/sqrt(log n)) has a sublinear exponent asymptotically.
+
+Models may generate candidate viewpoints and counterexamples; real people
+remain necessary to validate how those viewpoints represent lived experience.
+===== END FILE: scratch/bundle-lane/03-entry-point-note.md =====
+BUNDLE-END
