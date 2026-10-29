@@ -1,0 +1,93 @@
+Q wrapper review — 2026-10-09, America/Los_Angeles
+
+Disposition: useful implementation; revisions needed before integration.
+Source reviewed in full: Pasted text(20261010-030223).txt, beginning with
+# q_old_model_poll_v1.py. The submitted council.py, match_game.py and native
+STOP tests are byte-identical to the previously delivered patched versions.
+No uploaded source was edited, and the wrapper was not registered in MCP.
+
+Executed evidence
+12 test methods against the submitted wrapper, unchanged: 5 passed; 7 methods
+did not pass. unittest reports 8 assertion failures plus 1 error because the
+status-enum method has three failing subtests. These are explicit acceptance
+and control tests, with mocked native calls. No pretrained model ran.
+
+Passed
+- Complete successful native record, unknown fields, diagnostics, and null
+  token metrics survive normalization.
+- A native dispatch/preflight exception preserves successful sibling calls.
+- Match Game preserves its panel and reports the actual 120-second timeout.
+- Native STOP produces records for remaining unattempted calls.
+- A between-call wrapper signal prevents a second native dispatch.
+
+Required corrections, in priority order
+
+1. Isolate request-building errors by item.
+build_request_metas builds the entire list before poll_batch. A middle Match
+Game request missing premise raises ValueError and prevents all dispatches.
+The CLI then reports planned=0 with results=[] despite three supplied calls.
+Catch item validation errors into ordered error records, preserving input and
+index. Reserve whole-envelope rejection for malformed batch structure.
+Reproducer: requests=[{model_id:bert},{kind:match_game,model_id:albert},
+{model_id:gpt2}]. Expected: ok/error/ok with two actual native dispatches.
+
+2. Keep normalization failures from losing evidence or double-counting.
+poll_batch increments attempted before _normalize_raw, then again in except
+if normalization raises. A deliberate malformed raw model_id list triggers
+the path: one dispatch reports attempted=2, and the actual raw record is
+replaced by wrapper exception metadata. This is a defensive test, not output
+normally produced by the current engine. Increment once and keep returned raw
+even if normalization fails. Make the fallback record construction robust.
+
+3. Distinguish native evidence from wrapper-created records.
+_exception_item and _wrapper_stop_item manufacture dictionaries under raw.
+That conflicts with raw meaning the complete native return value. Proposed
+fix: raw=null if no native result exists; place wrapper observations in error
+and an explicitly named wrapper_event field. A clearly discriminated source
+schema is another possible design, but it must be agreed and tested. The
+included tests use the simpler raw=null convention.
+
+4. Use the agreed closed status enum.
+Normalize to ok/error/timeout/stopped/unattempted. Current code changes ok to
+success and permits unknown or arbitrary status strings. Preserve unexpected
+native statuses in raw/error metadata while reporting normalized error.
+Update summary counting to match. This is a contract mismatch rather than an
+inference failure; a coordinated schema revision would be an alternative.
+
+5. Preserve the original request shape and avoid unsupported STOP claims.
+Nested native requests lose their outer kind/label/timeout in requested_input.
+Keep the entire item there, and the cleaned native arguments in dispatch_input.
+Separately, remove the unconditional 'or stop_file' fallback: when a returned
+stopped record omits its source and no STOP was observed, the source is unknown.
+The unknown-source test confirmed the current envelope invents stop_file.
+
+Integration details to settle
+- mcp_tool_definition and mcp_handler are helpers, not server registration.
+  The supplied mcp_server.py still exposes the existing four tools only.
+  Register the accepted wrapper explicitly, then do an MCP round-trip test.
+- stop_check is polled between calls only. It cannot interrupt an in-flight
+  synchronous native invocation. The native STOP file remains the mid-call
+  interruption mechanism. Do not advertise the callback as mid-call cancel.
+- stop_phase currently adds 'unattempted', which was not in the agreed phase
+  enum. Use status=unattempted and a permitted/unknown phase, or explicitly
+  version the revised schema.
+- Current per-call request_id values differ from the outer batch request_id;
+  index corresponds to the proposed call_index. Choose and document the final
+  field names before consumers depend on them. The current generated_at is an
+  end timestamp; capture started_at at entry if the agreed field is retained.
+- The native Match Game failure path does not return framing/panel metadata.
+  The wrapper correctly leaves these unknown rather than inventing them; full
+  scoring metadata on failed attempts would need native support.
+- No durable incremental wrapper log exists yet. An envelope returned normally
+  preserves siblings, but process death does not have that guarantee.
+
+Re-run from any directory (stdlib Python, no model dependencies needed):
+python test_q_wrapper_contract.py /path/to/q_old_model_poll_v1.py /path/to/legacy-council
+The test accepts the original pasted .txt file as its first argument too.
+The second directory must contain council.py, match_game.py and registry.json.
+
+Suggested next step for Q
+Return a revised wrapper plus tests. Fix request-construction isolation and
+normalization accounting first, then provenance/status/request-shape details.
+We can re-run these acceptance checks before registering the MCP tool. Model
+quality and the optional ALBERT-to-decoder chain remain separate experiments.

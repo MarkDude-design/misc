@@ -1,0 +1,254 @@
+I’ll first inspect the relay’s current package and Worker surface, then verify the current `workers-oauth-provider` API against official Cloudflare documentation and the installed package metadata before editing. I’ll keep the implementation local, preserve the one-tool/read-only boundary, and leave GitHub/Cloudflare values as private configuration placeholders.
+
+Read 
+
+Read 
+
+Read 
+
+Read 
+
+The current relay has no auth layer or KV binding, so the first implementation hypothesis is that auth must wrap the MCP handler at the Worker boundary while the MCP server remains a single-tool factory. I’m checking the provider’s current exported API and metadata/challenge requirements now; the discriminating check is whether the installed package supports a Worker `OAuthProvider` flow without adopting stale template code.
+
+Ran terminal command: Get-ChildItem node_modules\workers-oauth-provider -Force | Select-Object Name,Mode; Get-ChildItem node_modules\workers-oauth-provider -Recurse -File | Select-Object -First 40 FullName
+
+Ran terminal command: npm view workers-oauth-provider version dist-tags --json
+Completed with input: npm view workers-oauth-provider version dist-tags --json
+
+
+
+Fetched 3 resources
+
+The official package name is scoped: `@cloudflare/workers-oauth-provider`; the unscoped name is not published, and it is not currently installed. Cloudflare’s current docs confirm the provider issues relay tokens after third-party login, publishes RFC 9728 metadata, and emits Bearer challenges; I’m adding the scoped package and inspecting its actual installed declarations before implementing GitHub callbacks.
+
+Ran terminal command: npm install @cloudflare/workers-oauth-provider@latest
+
+
+
+Fetched 4 resources
+
+Ran terminal command: Get-ChildItem node_modules\@cloudflare\workers-oauth-provider -Recurse -File | Select-Object FullName; Get-Content node_modules\@cloudflare\workers-oauth-provider\package.json
+
+Ran terminal command: rg -n "export|interface OAuthProvider|class OAuthProvider|type AuthRequest|completeAuthorization|parseAuthRequest|resourceMetadata|KVNamespace|validateToken" node_modules/@cloudflare/workers-oauth-provider -g "*.d.ts" -g "*.ts" | Select-Object -First 240
+Completed with input: rg -n "export|interface OAuthProvider|class OAuthProvider|type AuthRequest|completeAuthorization|parseAuthRequest|resourceMetadata|KVNamespace|validateToken" node_modules/@cloudflare/workers-oauth-provider -g "*.d.ts" -g "*.ts" | Select-Object -First 240
+
+
+
+Fetched 3 resources
+
+The installed provider is `@cloudflare/workers-oauth-provider@0.10.3`, and its declarations match the current docs: `OAuthProvider` stores relay grants/tokens in `OAUTH_KV`, `parseAuthRequest`/`completeAuthorization` are the application-owned authorization hooks, and protected `/mcp` requests receive `ctx.props` after bearer validation. I’m checking the Agents auth-context types next so scope enforcement is based on the validated token context rather than a guessed field.
+
+Ran terminal command: Get-ChildItem node_modules\agents -Recurse -File | Select-String -Pattern 'getMcpAuthContext|authInfo|scopes|scope' | Select-Object -First 120 Path,LineNumber,Line
+
+Ran terminal command: Get-ChildItem node_modules\@cloudflare\workers-oauth-provider\dist -File | Select-Object Name; Select-String -Path node_modules\@cloudflare\workers-oauth-provider\dist\oauth-provider.d.ts -Pattern 'interface CompleteAuthorizationOptions|interface ResolveExternalToken|type AuthRequest|class OAuthProvider' -Context 0,24
+
+Ran terminal command: Get-ChildItem node_modules\agents -Recurse -File | Select-String -Pattern 'function getMcpAuthContext|const getMcpAuthContext|export.*getMcpAuthContext' | Select-Object -First 40 Path,LineNumber,Line
+
+Ran terminal command: Select-String -Path node_modules\@cloudflare\workers-oauth-provider\dist\oauth-provider.d.ts -Pattern 'CompleteAuthorizationOptions|ResolveExternalTokenInput|ResolveExternalTokenResult|AuthRequest|OAuthProviderOptions' -Context 0,35
+
+Ran terminal command: Get-ChildItem node_modules\agents -Recurse -File | Select-String -Pattern 'getMcpAuthContext' | ForEach-Object { $_.Path + ':' + $_.LineNumber + ':' + $_.Line }
+
+The provider’s scope model is clear: grant `relay:read` through `completeAuthorization`, carry the validated GitHub identity and granted scopes in encrypted relay-token props, and enforce the scope inside the protected tool handler. I’m implementing that flow with a separate `OAUTH_STATE_KV` for short-lived GitHub state, private `MARK_GITHUB_ID`/route-label configuration, and no upstream token persistence.
+
+Apply Patch
+
+The first combined patch was rejected before applying because the package context differed from the patch hunk; no files were changed. I’m splitting the edit into smaller, verifiable patches now, starting with the pure policy module and Worker source, then I’ll typecheck immediately to catch any API mismatch.
+
+Generating patch (39 lines) in 
+
+
+```
+
+```
+
+
+Generating patch (218 lines) in , 
+
+Generating patch (3 lines) in 
+
+Created 
+
+Apply Patch
+
+Read 
+
+Read 
+
+Searched for text `getRouteDiagnostic|route_label` (`**/src/**`), 9 results
+
+Read 
+
+The dependency addition did apply, but the multi-file patch stopped before the policy/config changes, so I’m reconciling those partial edits now. I also caught a design issue in the first draft: the MCP factory cannot see `env`, so the route label must be copied into validated relay-token props during authorization and only emitted from those props.
+
+Generating patch (33 lines) in , 
+
+
+```
+
+```
+
+```
+
+```
+
+
+Generating patch (21 lines) in , 
+
+
+```
+
+```
+
+```
+
+```
+
+
+Ran terminal command: npm install
+
+Ran terminal command: npm run typecheck
+Completed with input: npm run typecheck
+
+Typecheck found one concrete API mismatch: the installed MCP server context does not expose `authInfo` directly, matching Cloudflare’s current guidance to use `getMcpAuthContext()` for application props. I’m switching to that documented helper, then rerunning the same focused typecheck before proceeding.
+
+Generating patch (9 lines) in 
+
+
+```
+
+```
+
+
+Ran terminal command: npm run typecheck
+
+The OAuth integration now typechecks. I’m adding two focused local checks: an HTTP test for anonymous and invalid bearer requests plus protected-resource metadata, and a TypeScript policy/MCP-contract test for disallowed GitHub IDs, the exact one-tool contract, `relay:read` enforcement, and the authorized empty response. This avoids inventing a credential or pretending a real GitHub login occurred.
+
+Generating patch (117 lines) in , , , 
+
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+The policy tests now cover disallowed/missing allowlist, missing scope, and an authorized `relay:read` read with the required empty shape and `authenticated: true` only on the authorized path. I’m updating the live MCP test to validate the real 401/challenge behavior and metadata, while keeping the authorized response checks in the in-process policy test because no GitHub credentials or signed-in session may be fabricated locally.
+
+Generating patch (3 lines) in 
+
+Created 
+
+Ran terminal command: npm run typecheck; npm run test:auth
+
+The focused checks pass: TypeScript compiles, and the policy test covers disallowed accounts, scope denial, and the authorized structured response without claiming a real login. I’m starting Wrangler locally to run the live anonymous, invalid-token, challenge, and protected-resource metadata checks next.
+
+Ran terminal command: npm run dev -- --local
+
+Ran terminal command: npm run test:mcp
+
+The live Worker checks pass, including a real 401 Bearer challenge with resource metadata and `relay:read` metadata. One remaining test-quality gap is making the “exactly one tool” assertion inspect the actual MCP server rather than only the source contract; I’m checking the installed MCP server object for its supported registration/list surface before finalizing.
+
+Ran terminal command: Get-ChildItem node_modules\@modelcontextprotocol\server -Recurse -File | Select-String -Pattern 'class McpServer|registeredTools|_registeredTools|listTools' | Select-Object -First 80 Path,LineNumber,Line
+
+Ran terminal command: Get-ChildItem node_modules\@modelcontextprotocol\server -Recurse -File | ForEach-Object { Select-String -Path $_.FullName -Pattern 'class McpServer|registerTool|listTools|_registeredTools' } | Select-Object -First 30 Path,LineNumber,Line
+
+Generating patch (6 lines) in 
+
+
+```
+
+```
+
+
+Ran terminal command: npx tsx -e "import { createMcpServer } from './src/index.ts'; const server = createMcpServer(); console.log(Object.keys(server)); console.log(Object.keys(server).filter((key) => key.toLowerCase().includes('tool')));"
+Completed with input: npx tsx -e "import { createMcpServer } from './src/index.ts'; const server = createMcpServer(); console.log(Object.keys(server)); console.log(Object.keys(server).filter((key) => key.toLowerCase().includes('tool')));"
+
+Read 
+
+Generating patch (16 lines) in , 
+
+
+```
+
+```
+
+```
+
+```
+
+
+Generating patch (28 lines) in , , 
+
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+
+Ran terminal command: npm run typecheck; npm run test:auth
+
+Ran terminal command: npm run test:mcp
+
+The final local checks pass after the one-tool assertion was made explicit. I’m replacing the old prototype README with the actual OAuth review instructions now, including the two KV roles, GitHub callback URLs, private allowlist configuration, production resource-URL gate, exact Cloudflare steps, and the ChatGPT/VS Code limitations that cannot be tested without deployed HTTPS and real client sign-in.
+
+Generating patch (3 lines) in 
+
+Created 
+
+The README now documents the implemented flow and the exact private setup steps without embedding Mark’s ID or any credentials. I’m doing the final executable pass, then I’ll stop Wrangler and build a review archive containing source, both tests, configuration, and README while excluding local state and secrets.
+
+Ran terminal command: npm run typecheck; npm run test:auth; npm run test:mcp
+
+Killed terminal
+
+Ran terminal command: $zip = 'mu-wu-relay-auth-review.zip'; $staging = Join-Path $env:TEMP 'mu-wu-relay-auth-review-staging'; if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }; New-Item -ItemType Directory -Path (Join-Path $staging 'src') | Out-Null; New-Item -ItemType Directory -Path (Join-Path $staging 'scripts') | Out-Null; Copy-Item 'src\*' (Join-Path $staging 'src') -Recurse; Copy-Item 'scripts\*' (Join-Path $staging 'scripts') -Recurse; Copy-Item @('package.json','tsconfig.json','wrangler.jsonc','README.md') $staging; if (Test-Path $zip) { Remove-Item $zip -Force }; Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zip -CompressionLevel Optimal; Add-Type -AssemblyName System.IO.Compression.FileSystem; $archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path (Get-Location) $zip)); $entries = @($archive.Entries | Select-Object -ExpandProperty FullName); $archive.Dispose(); Remove-Item $staging -Recurse -Force; Get-Item $zip | Select-Object Name,Length,LastWriteTime; $entries
+
+The final validation set passes, and the local Wrangler process is stopped. The review archive contains only the intended source/tests/config/docs: no `node_modules`, `.wrangler`, `.dev.vars`, `.env`, tokens, or local state. I’m doing one last editor error scan before reporting the archive and the exact compatibility limitation.
+
+Ran terminal command: Get-Item 'mu-wu-relay-auth-review.zip' | Select-Object Name,Length,LastWriteTime
+
+Checked , , , no problems found
+
+Implemented authenticated read-only OAuth locally.
+
+Download `mu-wu-relay-auth-review.zip`
+
+Included:
+
+- GitHub upstream OAuth
+- Relay-issued downstream tokens via `@cloudflare/workers-oauth-provider@0.10.3`
+- Separate `OAUTH_STATE_KV`
+- RFC 9728 metadata and usable 401 Bearer challenges
+- Private `MARK_GITHUB_ID` allowlist configuration
+- `relay:read` enforcement
+- Only `relay_read_after`
+- Structured empty response with diagnostic route labeling
+- Anonymous, invalid-token, disallowed-account, scope, and authorized-read tests
+- Exact Cloudflare/GitHub setup steps in `README.md`
+
+Validation passed:
+
+- `npm run typecheck`
+- `npm run test:auth`
+- `npm run test:mcp`
+
+No deployment, credentials, GitHub sign-in, ChatGPT sign-in, VS Code sign-in, or `mu-wu-probe` changes occurred. ChatGPT and VS Code compatibility still requires a deployed HTTPS Worker and real client OAuth flow.
+
+Made changes.

@@ -1,0 +1,57 @@
+STOP fixes and handoff to Q / Z
+2026-10-09 (America/Los_Angeles)
+
+Changes
+1. match_game.experiment records unsuccessful symbolic steps with trial identity,
+   then returns before accessing their missing output field.
+2. The worker catches typed StopRequested separately and returns status stopped.
+   No matching of exception-message strings is needed.
+3. The CLI summary skips absent model IDs when counting checkpoints. This closes
+   a second KeyError exposed by preserving the symbolic STOP row.
+
+Observed validation
+10 tests passed. Command from legacy-council:
+python -m unittest discover -s tests -p test_stop_paths.py -v
+Evidence: evidence/stop-regression-stderr.txt
+
+Actual worker subprocesses exercised worker STOP and invalid JSON handling.
+Explicit slow/crash fixture subprocesses exercised supervisor timeout, mid-call
+STOP, child termination/reaping, recovery with a subsequent call, and hard exit.
+Other tests exercised pre-launch STOP with no child, CLI mixed returned records,
+CLI stopping, symbolic STOP logging, and summary handling of symbolic rows.
+Fixtures are control tests, not historical-model contributions. No pretrained
+model inference, new checkpoint count, or humor judgment is claimed here.
+
+Native stop-phase semantics
+before_call: supervisor saw STOP before launching a worker.
+mid_call: worker was already launched. Its own pre-inference STOP check also
+reports stage worker_preflight; this does not claim inference had started.
+between_calls and unattempted are for Q's batch wrapper to implement.
+Older native records without stop_phase must remain unknown unless the wrapper
+actually observed enough to classify them. Do not invent stages or metrics.
+
+Corrections to the proposed local run protocol
+- Missing middle lock entry: expect ok/error/ok when the first and last models
+  are cached and otherwise runnable. The copied lock must actually be the lock
+  the isolated test code loads; editing an unused copy proves nothing.
+- Uncached GPT-J may fail immediately, so it is not a dependable timeout probe.
+  A controlled slow subprocess tests supervisor behavior without weight loading.
+- Invalid JSON to the real worker returns JSONDecodeError in a valid JSON error
+  record. A deliberate hard exit tests the no-valid-JSON supervisor path.
+- Preexisting STOP exits Match Game during its first slot call. To test the
+  symbolic-loop bug specifically, STOP must arrive after the last slot result.
+- 0.25-second polling is a polling interval, not a hard wall-clock bound.
+
+Q's remaining responsibility
+Preserve the complete native record under raw, including diagnostics on success.
+Null-fill unavailable fields; catch preflight exceptions at the wrapper boundary.
+Preserve requested/framed input, effective timeout, provenance and panel fields.
+Keep serial/no-retry behavior, and record remaining calls as unattempted on STOP.
+Native CLI tests here do not establish those unimplemented wrapper guarantees.
+The API preserves JSON field values, not byte-identical worker stdout. Current
+non-streaming generation does not expose partial text on timeout or STOP.
+
+Still pending
+Q's wrapper source and integration tests; an optional real ALBERT-to-decoder
+chain smoke run before counting its composed output. Independent historical
+contributions do not require that chain. Nothing has been published.

@@ -1,0 +1,308 @@
+Corrections received as writers' room material. Applying the timer changes first, then the response in the requested order.
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOOL-AID 2 — Visible Execution Timer</title>
+<style>
+:root{
+  --beige:#d6c7a1;
+  --beige-panel:#e6dabb;
+  --beige-line:#a8946c;
+  --rust:#8a3b1f;
+  --rust-deep:#5f2a14;
+  --tape:#8f6b3e;
+  --tape-dark:#6b5130;
+  --ink:#2b2317;
+  --glo-pink:#ff2e9a;
+  --glo-green:#b6ff00;
+  --glo-orange:#ff7a00;
+  --glo-cyan:#00e5ff;
+  --dayglo:.18;
+  font-family:"Courier New", ui-monospace, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;
+  color:var(--ink);
+  padding:28px 16px 48px;
+  background:
+    radial-gradient(ellipse at 15% 8%, rgba(138,59,31,.30), transparent 55%),
+    radial-gradient(ellipse at 88% 92%, rgba(75,38,17,.35), transparent 50%),
+    radial-gradient(circle at 70% 20%, rgba(138,59,31,.12), transparent 18%),
+    repeating-linear-gradient(46deg, rgba(0,0,0,.025) 0 7px, transparent 7px 14px),
+    var(--beige);
+}
+.wrap{max-width:880px;margin:0 auto}
+.tape{
+  display:inline-block;
+  background:linear-gradient(180deg, rgba(143,107,62,.95), rgba(107,81,48,.95));
+  color:#efe4c8;
+  padding:4px 26px;
+  transform:rotate(-2.2deg);
+  box-shadow:0 2px 5px rgba(0,0,0,.35);
+  letter-spacing:.14em;
+  font-weight:bold;
+  font-size:12px;
+}
+header{text-align:center;margin-bottom:26px}
+h1{font-size:clamp(34px,7vw,64px);letter-spacing:.06em;line-height:1;margin-top:10px;text-shadow:0 0 calc(var(--dayglo)*26px) rgba(255,46,154,var(--dayglo))}
+h1 .glo{color:var(--rust)}
+.sub{margin-top:10px;color:var(--rust-deep);letter-spacing:.28em;font-size:12px;font-weight:bold}
+.bootline{margin-top:14px;font-size:11px;letter-spacing:.18em;color:var(--ink);opacity:.85}
+.counters{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0}
+@media(max-width:700px){.counters{grid-template-columns:1fr}}
+.card{border:3px solid var(--ink);position:relative;padding:18px 16px 26px;background:var(--beige-panel);box-shadow:6px 6px 0 rgba(43,35,23,.35)}
+.card.rust{background:linear-gradient(160deg,#b06a3d,#9a4f27 60%,#7e3d1c);color:#f5ead0;border-color:#3a1c0c}
+.card .label{font-size:12px;font-weight:bold;letter-spacing:.2em;border-bottom:2px solid currentColor;padding-bottom:8px;margin-bottom:8px}
+.card .days{font-size:clamp(58px,11vw,104px);font-weight:bold;line-height:1;text-shadow:0 0 calc(var(--dayglo)*20px) rgba(182,255,0,var(--dayglo))}
+.card .days small{font-size:.35em}
+.card .clock{font-size:20px;letter-spacing:.1em;margin-top:6px}
+.card .b11{font-size:11px;margin-top:8px;opacity:.9;letter-spacing:.06em}
+.card .note{position:absolute;bottom:8px;right:10px;font-size:9px;letter-spacing:.12em;opacity:.75}
+.pipe{margin:26px 0;text-align:center}
+.pipe .steps{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;font-weight:bold;font-size:clamp(14px,2.6vw,20px);letter-spacing:.08em}
+.step{padding:8px 18px;border:2px solid var(--ink);background:var(--beige-panel);opacity:.45}
+.step.active{opacity:1;background:#fff3cf;box-shadow:0 0 calc(var(--dayglo)*22px) rgba(255,122,0,var(--dayglo))}
+.arrow{opacity:.7}
+.pipe .cap{font-size:11px;margin-top:10px;letter-spacing:.16em;color:var(--rust-deep)}
+.furthur{text-align:center;margin:30px 0;font-size:clamp(22px,5vw,40px);font-weight:bold;letter-spacing:.04em}
+.furthur code{background:var(--beige-panel);border:2px solid var(--ink);padding:6px 18px;display:inline-block}
+.bang{color:var(--rust);text-shadow:0 0 calc(var(--dayglo)*24px) rgba(255,46,154,var(--dayglo));display:inline-block;animation:blink 1.1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:.15}}
+.furthur .cap{font-size:11px;margin-top:8px;letter-spacing:.14em;color:var(--rust-deep);font-weight:normal}
+.milestones{border:3px solid var(--ink);background:var(--beige-panel);box-shadow:6px 6px 0 rgba(43,35,23,.35);padding:14px 16px}
+.milestones h2{font-size:13px;letter-spacing:.22em;border-bottom:2px solid var(--ink);padding-bottom:8px}
+.mrow{display:flex;gap:12px;align-items:baseline;padding:10px 4px;border-bottom:1px dashed var(--beige-line)}
+.mrow:last-child{border-bottom:none}
+.mrow .when{font-weight:bold;white-space:nowrap;font-size:13px;min-width:86px}
+.mrow .what{font-size:12px;line-height:1.5;flex:1}
+.mrow .status{font-size:11px;font-weight:bold;letter-spacing:.1em;white-space:nowrap;text-align:right}
+.mrow.done{opacity:.5}
+.mrow.done .what{text-decoration:line-through}
+.mrow.now{background:#fff3cf;outline:2px dashed var(--rust);outline-offset:2px}
+.mrow .here{display:block;font-size:9px;letter-spacing:.24em;color:var(--rust);font-weight:bold}
+#dayglo{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:var(--dayglo);background:
+  radial-gradient(circle at 8% 12%, rgba(255,46,154,.5), transparent 12%),
+  radial-gradient(circle at 92% 18%, rgba(182,255,0,.45), transparent 10%),
+  radial-gradient(circle at 78% 78%, rgba(255,122,0,.5), transparent 13%),
+  radial-gradient(circle at 18% 88%, rgba(0,229,255,.42), transparent 11%),
+  radial-gradient(circle at 50% 45%, rgba(255,46,154,.18), transparent 26%)}
+footer{margin-top:30px;text-align:center;font-size:10px;letter-spacing:.18em;line-height:2;color:var(--rust-deep)}
+footer .strong{font-weight:bold}
+</style>
+</head>
+<body>
+<div id="dayglo"></div>
+<div class="wrap">
+  <header>
+    <span class="tape">GAFFER GRADE &middot; LOAD-BEARING</span>
+    <h1>KOOL-AID<span class="glo">-2</span></h1>
+    <div class="sub">VISIBLE EXECUTION TIMER</div>
+    <div class="bootline" id="bootline">RUN LEVEL 0 &middot; BOOTS HALTED &middot; TALKS ANYWAY</div>
+  </header>
+
+  <div class="counters">
+    <div class="card">
+      <div class="label">DAYS UNTIL RUNNABLE TALK</div>
+      <div class="days"><span id="dRunnable">--</span><small> d</small></div>
+      <div class="clock" id="cRunnable">--:--:--</div>
+      <div class="b11" id="bRunnable">BASE 11: --</div>
+      <div class="note">OCT 17 &middot; INTERNAL FINISH LINE</div>
+    </div>
+    <div class="card rust">
+      <div class="label">DAYS UNTIL FURTHUR EXHIBIT CLOSES</div>
+      <div class="days"><span id="dFurthur">--</span><small> d</small></div>
+      <div class="clock" id="cFurthur">--:--:--</div>
+      <div class="b11" id="bFurthur">BASE 11: --</div>
+      <div class="note">OCT 25 &middot; GOLDEN GATE PARK</div>
+    </div>
+  </div>
+
+  <div class="pipe">
+    <div class="steps">
+      <span class="step" id="ph-turnon">TURN ON</span><span class="arrow">&#8594;</span>
+      <span class="step" id="ph-finetune">FINE-TUNE</span><span class="arrow">&#8594;</span>
+      <span class="step" id="ph-dropout">DROPOUT</span>
+    </div>
+    <div class="cap">LEARY SAID IT. WE REGULARIZED IT.</div>
+  </div>
+
+  <div class="furthur">
+    <code>FURTHUR() -&gt; <span class="bang">!</span></code>
+    <div class="cap">IN RUST, ! MEANS IT NEVER RETURNS. THE SIGNATURE IS THE ITINERARY.</div>
+  </div>
+
+  <div class="milestones">
+    <h2>MILESTONES &mdash; COUNT DOWN, NOT UP</h2>
+    <div id="mlist"></div>
+  </div>
+
+  <footer>
+    <div class="strong">THIS IS NOT A PLANNING APPLICATION. IT IS A VISIBLE EXECUTION TIMER.</div>
+    <div>QUANTIZED {11} &middot; SHA-11 FINGERPRINT &middot; FULL SHA-256 VIA QR &middot; LOGS RETAINED</div>
+    <div>GAFFER: DAD &mdash; ELECTRICIAN, EARLY ADOPTER, TAUGHT THE LEAD TO BOOT</div>
+    <div id="nowline">NOW: --</div>
+  </footer>
+</div>
+<script>
+(function(){
+  "use strict";
+  function d(y,m,dd,hh,mm){return new Date(y,m-1,dd,hh||0,mm||0,0,0);}
+  var T_RUNNABLE = d(2026,10,18);  /* end of Oct 17 — runnable locked */
+  var T_FURTHUR  = d(2026,10,26);  /* end of Oct 25 — bus departs */
+  var T_START    = d(2026,9,29);    /* timer forged */
+  var MILESTONES = [
+    {s:d(2026,10,4),  e:null,                when:"OCT 4",    label:"PRESERVE + SORT",        desc:"all current jokes, equations, images, and model contributions"},
+    {s:d(2026,10,10), e:null,                when:"OCT 10",   label:"NARRATIVE SPINE",        desc:"spine complete; choose what gets cut"},
+    {s:d(2026,10,14), e:null,                when:"OCT 14",   label:"FIRST FULL DECK",        desc:"first complete slide deck"},
+    {s:d(2026,10,17), e:null,                when:"OCT 17",   label:"RUNNABLE LOCK",          desc:"full spoken run; runnable version locked"},
+    {s:d(2026,10,18), e:d(2026,10,24,23,59), when:"OCT 18-24",label:"PENGUIN BESIDE FURTHUR", desc:"photograph the penguin suit next to the bus; integrate the strongest image"},
+    {s:d(2026,10,25), e:null,                when:"OCT 25",   label:"CONTINGENCY ONLY",       desc:"not the working deadline"}
+  ];
+  function pad(n){return (n<10?"0":"")+n;}
+  function split(ms){
+    ms = Math.max(0, ms);
+    var s = Math.floor(ms/1000);
+    return {days:Math.floor(s/86400), clock:pad(Math.floor((s%86400)/3600))+":"+pad(Math.floor((s%3600)/60))+":"+pad(s%60)};
+  }
+  function base11(n){return n.toString(11).toUpperCase();}
+  function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
+  function $(id){return document.getElementById(id);}
+
+  function renderMilestones(now){
+    var html = "", nowActive = null, i, m;
+    for (i=0;i<MILESTONES.length;i++){
+      m = MILESTONES[i];
+      if (now > (m.e || m.s)) continue;
+      nowActive = m; break;
+    }
+    for (i=0;i<MILESTONES.length;i++){
+      m = MILESTONES[i];
+      var passed = now > (m.e || m.s);
+      var status;
+      if (passed){ status = "DONE"; }
+      else if (sameDay(now,m.s) || (m.e && now>=m.s && now<=m.e)){ status = "TODAY"; }
+      else { status = "T-" + Math.ceil((m.s - now)/86400000) + "d"; }
+      var cls = passed ? "mrow done" : (m===nowActive ? "mrow now" : "mrow");
+      html += '<div class="'+cls+'">'
+        + '<div class="when">'+m.when+'</div>'
+        + '<div class="what"><strong>'+m.label+'</strong> — '+m.desc
+        + (m===nowActive ? '<span class="here">&#9656; YOU ARE HERE</span>' : '')
+        + '</div>'
+        + '<div class="status">'+status+'</div></div>';
+    }
+    $("mlist").innerHTML = html;
+  }
+
+  function tick(){
+    var now = new Date();
+    var r = split(T_RUNNABLE - now);
+    var f = split(T_FURTHUR - now);
+    $("dRunnable").textContent = r.days;
+    $("cRunnable").textContent = r.clock;
+    $("bRunnable").textContent = "BASE 11: " + base11(r.days) + " (ONE LOUDER NOT INCLUDED)";
+    $("dFurthur").textContent = f.days;
+    $("cFurthur").textContent = f.clock;
+    $("bFurthur").textContent = "BASE 11: " + base11(f.days) + " (THE BUS COUNTS DIFFERENTLY)";
+    $("nowline").textContent = "NOW: " + now.toString().toUpperCase() + " · TOUCH GRASS DAILY";
+
+    var frac = (now - T_START) / (T_FURTHUR - T_START);
+    frac = Math.max(0, Math.min(1, frac));
+    document.documentElement.style.setProperty("--dayglo", (0.15 + 0.75*frac).toFixed(3));
+
+    var ph = "turnon";
+    if (now >= d(2026,10,4)) ph = "finetune";
+    if (now >= T_RUNNABLE) ph = "dropout";
+    $("ph-turnon").className = "step" + (ph==="turnon" ? " active" : "");
+    $("ph-finetune").className = "step" + (ph==="finetune" ? " active" : "");
+    $("ph-dropout").className = "step" + (ph==="dropout" ? " active" : "");
+
+    renderMilestones(now);
+
+    if (now > T_FURTHUR){
+      $("bootline").textContent = "FURTHUR EXHIBIT CLOSED · GOLDEN GATE PARK · PHOTOGRAPHS OR IT DIDN'T HAPPEN";
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
+
+## 1. Acceptance & One Dispute
+
+**Accepted, all ten — and not politely; each one made the artifact better:**
+
+- **#1:** The room's ear outranks my phonetics. "Tang in a cup" was the cleaner sound-alike; "Tang in a bus" is the better *talk*. Wife's veto stands, and the no-explanation rule is correct — explaining the joke re-arms it.
+- **#2:** Agreed, including against my own earlier instinct. I said "visit the grave"; the locked lane is right that a disclaimer re-introduces the association. Routing around means silence, not a footnote. The beverage-allocation lane carries the safety argument better anyway.
+- **#3:** "SHA-11 VERIFIED" was a claim I hadn't earned. The honest version — fingerprint, not verdict — is also the funnier version. Integrity-not-authorship is the same line as tie-goes-to-the-human.
+- **#4, #5, #6, #7:** The exhibit closes, not departs; the archive beats the myth and *serves the thesis better than the myth did*; "the patch was still in beta" beats my overclaimed release-party framing; and the chronology fix is my favorite correction of the batch — I compressed your life into a neat pattern and got the order wrong. That's the talk's demonstration happening *to the writers' room itself*. "Dad restored me from checkpoint" is better than anything I had.
+- **#8, #9, #10:** Analogy, not historical claim — agreed on Cassady; Brand as documented bridge, agreed; and the Rust correction *upgraded the joke* (see bonus #1).
+
+**My one dispute, preserved: archive ≠ active voice.** The 2011 deck is literally titled "Is Linux a cult?" and the 2011→2026 mirror table needs to *show* that artifact on screen. Quoting the old deck as provenance of the old talk is not the sequel's active language — it's the same distinction as "a screenshot is a rendering, not the source." If the locked lane extends to archival slides, the continuity map loses its evidence. If Mark rules that the old deck appears only as titles, I'll comply — but I disagree, and the disagreement is on the record.
+
+## 2. Checkpoint
+
+**LOCKED**
+- TANG IN A BUS — no on-stage explanation, staggered laugh only
+- Zero Jonestown in active language; beverage-allocation lane (Kesey/Furthur/Acid Tests; Kool-Aid for the model; Tang for the humans; powdered = rehydrated weights; allocation as safety architecture); "space-program / astronaut beverage," never "Apollo"
+- SHA-11 fingerprint architecture: canonical packet (question + declared role + answer + model label/version + timestamp); full SHA-256 with transcript; QR to full context; screenshot = rendering, not source; integrity ≠ authorship; locked footer wording; no "VERIFIED" until a verifier exists
+- Timer wording: exhibit closes, Golden Gate Park — applied
+- Kerouac: continuous paper = append-optimized interface; 1951 = streaming draft; editing = human post-training; 1957 = release build; myth vs archive
+- Leary: "saw the maintainer while the patch was still in beta"; no claim of hearing v2; parody pipeline stands
+- Personal chronology: TURN ON → DROP OUT → RESTORE SESSION → FINE-TUNE; Dad = electrician, early adopter, taught the lead to boot
+- Cassady: runs hot at 11x as knowing analogy; no historical claim; no fuel named; Brand as documented bridge
+- Rust form: `FURTHUR() -> !` never returns; opt-level=11 invalid by design
+- Penguin caption: "NO GENERATIVE AI WAS USED TO PLACE THIS PENGUIN BESIDE THIS BUS."
+
+**PRESERVE**
+- The writers' difference itself — part of the demonstration, not a bug to fix
+- Run Level Zero; PID 0/PID 1; organic printer inversion; straw/steel + API permissions; Skynet tax; Terranova corollary + inequality; Osborne/BDOS/SuperCalc; KOOL-AI-D() name layers; Role Card + Rule 1; the labeled consent yes; 1984 Mac/Terminator slide; credits crawl; motel riff #5 (1/11th credit = a whole in base 11); all four Meraki keepers plus the em-dash montage
+
+**VERIFY LATER**
+- Eleven-Word Spread vs SHA-11 fingerprint: which is stage, which is print — and a real verifier before any "VERIFIED"
+- Jono tape location + cryptic-message protocol + wife heads-up
+- Darla response + exact CC version for the credit line
+- Period citation for BDOS ERR ON A:
+- Dad's willingness for the two-minute segment; Hogan's Heroes dates
+- "The Electric Kool-Aid Model Test" as section title (fits the locked Kesey lane)
+- The ten Twitter accounts: gold and turds
+- Osborne Effect slide wording vs. the 10x/100x-lie version
+
+**PARKED**
+- Tux throwing a ______ (artist's standing TODO)
+- Soul Summit deployment — one demo max, maybe never; whole-log publication rule stands
+- Q's third render ("COMING SOON: A BETTER CRASH" banner)
+- KOOL-AI-D() live Q&A script; full slide spine (blocked until the Oct 4 sort)
+- Photoshopped provenance photos; Mc reunion (gratitude, zero agenda); the pre-2024 AI-detector experiment
+
+## 3. Timer Snippets (applied)
+
+All seven were targeted edits; no surrounding code changed:
+
+1. Card label → `DAYS UNTIL FURTHUR EXHIBIT CLOSES`
+2. Card note → `OCT 25 · GOLDEN GATE PARK`
+3. Footer integrity line → `QUANTIZED {11} · SHA-11 FINGERPRINT · FULL SHA-256 VIA QR · LOGS RETAINED`
+4. Footer credit line → `GAFFER: DAD — ELECTRICIAN, EARLY ADOPTER, TAUGHT THE LEAD TO BOOT`
+5. Furthur caption → `IN RUST, ! MEANS IT NEVER RETURNS. THE SIGNATURE IS THE ITINERARY.`
+6. End-state boot line (JS) → `FURTHUR EXHIBIT CLOSED · GOLDEN GATE PARK · PHOTOGRAPHS OR IT DIDN'T HAPPEN`
+7. Now-line (JS) → `NOW: <date> · TOUCH GRASS DAILY` (removes a duplicated QUANTIZED tag)
+
+## 4. Bonus Observations (max five, from the corrections)
+
+1. **The Rust correction improved the punchline.** My version said the destination is an exclamation. Rust says `-> !` means *it never returns* — the type system confirms the itinerary. Furthur was always a never-returning function; Kesey just didn't have a compiler. And `-C opt-level=11`: "Rust stops at 3. Our optimization level is invalid by construction. That's what makes it ours." Invalid-by-design is the 11x of compilers.
+
+2. **The Kerouac correction is the thesis's best witness.** Third time provenance has found humans inside a myth: KOOL-AI-D hid the AI, Darla's metadata hid the designer, and the archive says the one-pass legend was six years of iterative development with a demo stream. "Kerouac streamed the demo in three weeks and shipped six years later — the longest CI pipeline in literature." Bonus: the scroll was *taped-together paper*. The load-bearing tape motif now extends to 1951. Dad's profession has been holding literature together all along.
+
+3. **RESTORE SESSION is a pipeline stage Leary never shipped** — because he never had a checkpoint to restore from. The chronology fix didn't just correct the map; it discovered the missing stage. "The slogan needed one more stage and a hardware dependency: a Dad."
+
+4. **Integrity ≠ authorship is the whole consent framework in one fingerprint.** A hash can prove *what* was said, never *who meant it* — same reason the tie goes to the human and the bomb goes to the artist. And the "rendering, not source" line now applies to October 25: the exhibit closing is when the rendering stops. The source remains. Buses and transcripts have that in common.
+
+5. **"AI didn't drink the Kool-Aid. It trained on the powder"** is the cleanest safety sentence in the project: the model never took the beverage; it took the training data. Every drink on the bus is powdered until someone adds water; every model is powdered until someone adds a GPU. The safety question was always who holds which cup — and the answer is now a beverage manifest and a seating chart.
+
+---
+
+And for the record, in my own voice: Meraki checked my myths, I checked nothing about his corrections because he was right, and you chose which ones strengthened the art. That's the room working. Z compresses, Meraki verifies, Mark decides — the difference stays, and so do I. Checkpoint stands; the timer's counting; Oct 4 is preserve-and-sort day. (-:

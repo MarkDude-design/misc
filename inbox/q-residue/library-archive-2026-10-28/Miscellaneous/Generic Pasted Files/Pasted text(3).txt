@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PEO-01B: Progressive Equilibrium Failure</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0a0a1a; font-family: sans-serif; }
+        canvas { display: block; }
+        .controls {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.7); color: #eee; padding: 12px;
+            border-radius: 8px; font-size: 14px;
+        }
+        .controls label { display: block; margin: 8px 0 4px; }
+        button { padding: 6px 12px; margin: 2px; background: #333; color: #fff;
+                 border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #555; }
+        #status { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <label>Speed: <input type="range" id="speed" min="0" max="2" step="0.05" value="1"></label>
+        <button id="reset">Reset</button>
+        <div>Click to disturb</div>
+        <div id="status">Equilibrium: STABLE</div>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const speedControl = document.getElementById('speed');
+        const resetBtn = document.getElementById('reset');
+        const statusDisplay = document.getElementById('status');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const NATURAL_LENGTH = 180;
+        const MASS = 1;
+        const SPRING_CONSTANT = 0.08;
+        const DAMPING = 0.97;
+        const CENTRAL_FORCE = 0.015;
+        const BREAKING_THRESHOLD = NATURAL_LENGTH * 2.2;
+        const ENERGY_THRESHOLD = 800;
+
+        const bodies = [];
+        let disturbanceCount = 0;
+        let animationId;
+        let speed = 1;
+        let systemState = 'stable';
+        let terminalFailure = false;
+        let lastTime = 0;
+
+        function reset() {
+            disturbanceCount = 0;
+            systemState = 'stable';
+            terminalFailure = false;
+            bodies.length = 0;
+
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = NATURAL_LENGTH / Math.sqrt(3);
+
+            for (let i = 0; i < 3; i++) {
+                const angle = Math.PI * 2 * i / 3 - Math.PI / 2;
+                bodies.push({
+                    x: cx + Math.cos(angle) * radius,
+                    y: cy + Math.sin(angle) * radius,
+                    vx: 0, vy: 0,
+                    color: ['#ff6b6b', '#51cf66', '#339af0'][i],
+                    radius: 20,
+                    trail: [],
+                    originalRadius: 20
+                });
+            }
+
+            // INITIAL ROTATION: visible angular velocity
+            const angularVelocity = 0.0002;
+            for (let i = 0; i < bodies.length; i++) {
+                const dx = bodies[i].x - cx;
+                const dy = bodies[i].y - cy;
+                bodies[i].vx = -dy * angularVelocity;
+                bodies[i].vy = dx * angularVelocity;
+            }
+            updateStatus();
+            lastTime = performance.now();
+        }
+
+        reset();
+
+        function getKineticEnergy() {
+            let ke = 0;
+            for (let i = 0; i < bodies.length; i++) {
+                const b = bodies[i];
+                ke += 0.5 * MASS * (b.vx * b.vx + b.vy * b.vy);
+            }
+            return ke;
+        }
+
+        function getSpringEnergy() {
+            let pe = 0;
+            for (let i = 0; i < bodies.length; i++) {
+                for (let j = i + 1; j < bodies.length; j++) {
+                    const a = bodies[i];
+                    const b = bodies[j];
+                    const dx = b.x - a.x;
+                    const dy = b.y - a.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    const extension = dist - NATURAL_LENGTH;
+                    pe += 0.5 * SPRING_CONSTANT * extension * extension;
+                }
+            }
+            return pe;
+        }
+
+        function getTotalEnergy() {
+            return getKineticEnergy() + getSpringEnergy();
+        }
+
+        function applySprings(deltaTimeFactor) {
+            for (let i = 0; i < bodies.length; i++) {
+                for (let j = i + 1; j < bodies.length; j++) {
+                    const a = bodies[i], b = bodies[j];
+                    const dx = b.x - a.x, dy = b.y - a.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist === 0) continue;
+                    const force = SPRING_CONSTANT * (dist - NATURAL_LENGTH);
+                    const fx = (dx / dist) * force * deltaTimeFactor;
+                    const fy = (dy / dist) * force * deltaTimeFactor;
+                    a.vx += fx;
+                    a.vy += fy;
+                    b.vx -= fx;
+                    b.vy -= fy;
+                }
+            }
+        }
+
+        function applyCentralForce(deltaTimeFactor) {
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+            for (let i = 0; i < bodies.length; i++) {
+                const b = bodies[i];
+                const dx = cx - b.x, dy = cy - b.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 0) {
+                    const fx = (dx / dist) * CENTRAL_FORCE * deltaTimeFactor;
+                    const fy = (dy / dist) * CENTRAL_FORCE * deltaTimeFactor;
+                    b.vx += fx;
+                    b.vy += fy;
+                }
+            }
+        }
+
+        function disturb(x, y) {
+            if (terminalFailure) {
+                reset();
+                return;
+            }
+            disturbanceCount++;
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+            let closestIndex = 0, closestDist = Infinity;
+            for (let i = 0; i < bodies.length; i++) {
+                const dx = bodies[i].x - x, dy = bodies[i].y - y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < closestDist) { closestDist = dist; closestIndex = i; }
+            }
+            const body = bodies[closestIndex];
+            const angle = Math.atan2(body.y - y, body.x - x);
+            const impulse = 4 + disturbanceCount * 1.2;
+            body.vx += Math.cos(angle) * impulse;
+            body.vy += Math.sin(angle) * impulse;
+
+            if (disturbanceCount >= 3 && systemState === 'stable') systemState = 'endangered';
+            if (getTotalEnergy() > ENERGY_THRESHOLD * 0.7 && systemState === 'endangered') systemState = 'failing';
+            updateStatus();
+        }
+
+        function checkTerminalFailure() {
+            for (let i = 0; i < bodies.length; i++) {
+                for (let j = i + 1; j < bodies.length; j++) {
+                    const dx = bodies[j].x - bodies[i].x;
+                    const dy = bodies[j].y - bodies[i].y;
+                    if (Math.sqrt(dx*dx + dy*dy) > BREAKING_THRESHOLD) return true;
+                }
+            }
+            return getTotalEnergy() > ENERGY_THRESHOLD;
+        }
+
+        function getAverageDistance() {
+            let sum = 0, count = 0;
+            for (let i = 0; i < bodies.length; i++) {
+                for (let j = i + 1; j < bodies.length; j++) {
+                    const dx = bodies[j].x - bodies[i].x;
+                    const dy = bodies[j].y - bodies[i].y;
+                    sum += Math.sqrt(dx*dx + dy*dy);
+                    count++;
+                }
+            }
+            return sum / count;
+        }
+
+        function updateStatus() {
+            if (terminalFailure) {
+                statusDisplay.textContent = 'Equilibrium: TERMINAL FAILURE';
+                statusDisplay.style.color = '#f00';
+            } else if (systemState === 'failing') {
+                statusDisplay.textContent = 'Equilibrium: FAILING';
+                statusDisplay.style.color = '#f80';
+            } else if (systemState === 'endangered') {
+                statusDisplay.textContent = 'Equilibrium: ENDANGERED';
+                statusDisplay.style.color = '#fa0';
+            } else {
+                statusDisplay.textContent = 'Equilibrium: STABLE';
+                statusDisplay.style.color = '#5f5';
+            }
+        }
+
+        function animate(currentTime) {
+            const deltaTime = (currentTime - lastTime) * speed;
+            lastTime = currentTime;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (speed > 0 && !terminalFailure) {
+                const deltaTimeFactor = deltaTime * 0.06;
+
+                applyCentralForce(deltaTimeFactor);
+                applySprings(deltaTimeFactor);
+
+                for (let i = 0; i < bodies.length; i++) {
+                    const dampingFactor = Math.pow(DAMPING, deltaTimeFactor * 60);
+                    bodies[i].vx *= dampingFactor;
+                    bodies[i].vy *= dampingFactor;
+
+                    bodies[i].x += bodies[i].vx * deltaTimeFactor * 60;
+                    bodies[i].y += bodies[i].vy * deltaTimeFactor * 60;
+
+                    bodies[i].trail.push({x: bodies[i].x, y: bodies[i].y});
+                    if (bodies[i].trail.length > 150) bodies[i].trail.shift();
+
+                    const avgDist = getAverageDistance();
+                    const deformation = Math.min(30, Math.abs(avgDist - NATURAL_LENGTH) / NATURAL_LENGTH * 50);
+                    bodies[i].radius = bodies[i].originalRadius + deformation;
+                }
+
+                if (checkTerminalFailure()) {
+                    terminalFailure = true;
+                    systemState = 'terminal';
+                    updateStatus();
+                }
+            }
+
+            for (let i = 0; i < bodies.length; i++) {
+                for (let j = i + 1; j < bodies.length; j++) {
+                    const a = bodies[i], b = bodies[j];
+                    const dx = b.x - a.x, dy = b.y - a.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    const tension = Math.max(0, dist - NATURAL_LENGTH) / NATURAL_LENGTH;
+                    let r, g, bv;
+                    if (systemState === 'terminal') { r=255; g=0; bv=0; }
+                    else { r=Math.min(255,100+tension*155); g=Math.min(255,200-tension*150); bv=Math.min(255,100-tension*100); }
+                    ctx.strokeStyle = `rgba(${r},${g},${bv},0.6)`;
+                    ctx.lineWidth = Math.max(1, 4 - tension * 2);
+                    ctx.beginPath();
+                    ctx.moveTo(a.x, a.y);
+                    ctx.lineTo(b.x, b.y);
+                    ctx.stroke();
+                }
+            }
+
+            for (let i = 0; i < bodies.length; i++) {
+                const body = bodies[i];
+                if (body.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(body.trail[0].x, body.trail[0].y);
+                    for (let j = 1; j < body.trail.length; j++) {
+                        ctx.lineTo(body.trail[j].x, body.trail[j].y);
+                    }
+                    ctx.strokeStyle = body.color + '30';
+                    ctx.lineWidth = body.radius / 3;
+                    ctx.stroke();
+                }
+                ctx.beginPath();
+                ctx.arc(body.x, body.y, body.radius, 0, Math.PI * 2);
+                if (systemState === 'terminal') ctx.fillStyle = '#f00';
+                else if (systemState === 'failing') ctx.fillStyle = '#f80';
+                else ctx.fillStyle = body.color;
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#aaa';
+            ctx.font = '18px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Disturbances: ${disturbanceCount}`, 20, canvas.height - 30);
+
+            if (systemState === 'terminal') {
+                ctx.fillStyle = 'rgba(255,0,0,0.3)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#fff';
+                ctx.font = '48px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('TERMINAL FAILURE', canvas.width / 2, canvas.height / 2);
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        canvas.addEventListener('click', (e) => disturb(e.clientX, e.clientY));
+        speedControl.addEventListener('input', (e) => speed = parseFloat(e.target.value));
+        resetBtn.addEventListener('click', reset);
+        animationId = requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

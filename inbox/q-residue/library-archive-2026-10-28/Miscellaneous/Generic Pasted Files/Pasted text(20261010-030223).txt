@@ -1,0 +1,1213 @@
+# q_old_model_poll_v1.py
+"""
+Thin normalization wrapper for the historical-model inference engine.
+
+This module does not load models.
+It calls the existing native entry points:
+
+    council.invoke(request, timeout=...)
+    match_game.panel_input(model_id, premise, mode=...)
+
+and returns a normalized polling envelope while preserving each native result
+under `raw`.
+
+Design constraints:
+
+- Serial execution only.
+- No automatic retries.
+- Preserve complete native records, including diagnostics.
+- Null-fill unavailable token metrics.
+- Do not convert masked-token candidates into generated prose.
+- Preserve requested input, native dispatch input, and effective framed input
+  when the native layer provides it.
+- Honor STOP and account for:
+    native before_call
+    native mid_call
+    wrapper between_calls
+    wrapper unattempted
+- Do not invent stop phases or metrics for older native records.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+try:
+    import council
+except Exception as exc:  # pragma: no cover - exercised only in broken installs
+    council = None  # type: ignore[assignment]
+    COUNCIL_IMPORT_ERROR: Optional[BaseException] = exc
+else:
+    COUNCIL_IMPORT_ERROR = None
+
+try:
+    import match_game as _match_game
+except Exception:  # pragma: no cover - Match Game is optional for native polling
+    _match_game = None  # type: ignore[assignment]
+
+
+DEFAULT_TIMEOUT = 300.0
+MATCH_GAME_NATIVE_TIMEOUT = 120.0
+
+SUCCESS_STATUSES = {"ok", "success", "done", "completed"}
+ERROR_STATUSES = {"error", "failed", "failure", "exception"}
+TIMEOUT_STATUSES = {"timeout", "timed_out", "deadline_exceeded"}
+STOPPED_STATUSES = {"stopped", "stop", "cancelled", "canceled"}
+
+
+# ---------------------------------------------------------------------
+# Small utilities
+# ---------------------------------------------------------------------
+
+def _utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+def _as_float(value: Any, default: Optional[float] = None) -> Optional[float]:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _round_seconds(value: float) -> float:
+    return round(float(value), 6)
+
+
+def _stop_present() -> bool:
+    """
+    Check the native STOP file exposed by council.py.
+
+    If council is unavailable or STOP is not exposed, return False.
+    """
+    if council is None:
+        return False
+
+    stop_path = getattr(council, "STOP", None)
+    if stop_path is None:
+        return False
+
+    try:
+        return Path(stop_path).exists()
+    except Exception:
+        return False
+
+
+def _stop_state(
+    stop_check: Optional[Callable[[], bool]],
+) -> Tuple[bool, Optional[str]]:
+    """
+    Return (should_stop, source).
+
+    Sources:
+      - wrapper_signal
+      - wrapper_signal_error
+      - stop_file
+      - None
+    """
+    if stop_check is not None:
+        try:
+            if bool(stop_check()):
+                return True, "wrapper_signal"
+        except Exception:
+            # Fail closed: if the external stop check itself breaks, stop.
+            return True, "wrapper_signal_error"
+
+    if _stop_present():
+        return True, "stop_file"
+
+    return False, None
+
+
+# ---------------------------------------------------------------------
+# Request construction
+# ---------------------------------------------------------------------
+
+def _meta_from_native_item(
+    item: Dict[str, Any],
+    default_timeout: float,
+) -> Dict[str, Any]:
+    """
+    Build a native-request meta object.
+
+    Accepted shapes:
+
+      {"model_id": "bert", "text": "..."}
+
+    or:
+
+      {"kind": "native", "label": "...", "request": {...}}
+
+    Wrapper-only keys:
+      - kind
+      - label
+      - timeout
+
+    The exact native request passed to council.invoke() is stored under
+    meta["request"]. The user-supplied shape is preserved under
+    meta["original_input"].
+    """
+    label = item.get("label")
+
+    if "request" in item and isinstance(item.get("request"), dict):
+        original = dict(item["request"])
+    else:
+        original = dict(item)
+
+    clean = dict(original)
+
+    # Remove wrapper-only keys from the native request.
+    clean.pop("kind", None)
+    clean.pop("label", None)
+    clean.pop("request", None)
+
+    timeout = item.get("timeout")
+    if timeout is None:
+        timeout = clean.pop("timeout", None)
+    else:
+        clean.pop("timeout", None)
+
+    timeout = _as_float(timeout, default_timeout)
+    if timeout is None:
+        timeout = default_timeout
+
+    return {
+        "kind": "native",
+        "label": label,
+        "request": clean,
+        "original_input": original,
+        "timeout": timeout,
+    }
+
+
+def _meta_from_match_game_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build a Match Game meta object.
+
+    Expected shape:
+
+      {
+        "kind": "match_game",
+        "model_id": "bert",
+        "premise": "The chef ... <MASK> ...",
+        "mode": "slot"
+      }
+
+    match_game.panel_input() currently uses a hardcoded native timeout of 120
+    seconds. This wrapper preserves that behavior and records it as the
+    effective timeout. A wrapper-level timeout on a Match Game request is
+    preserved in original_input for auditability but is not silently applied.
+    """
+    model_id = item.get("model_id")
+    premise = item.get("premise")
+    mode = item.get("mode", "slot")
+    label = item.get("label")
+
+    if model_id is None:
+        raise ValueError("match_game request requires model_id")
+    if premise is None:
+        raise ValueError("match_game request requires premise")
+    if mode not in ("slot", "continue"):
+        raise ValueError("match_game mode must be 'slot' or 'continue'")
+
+    return {
+        "kind": "match_game",
+        "label": label,
+        "model_id": model_id,
+        "premise": premise,
+        "mode": mode,
+        "original_input": dict(item),
+        # Not applied to panel_input(); retained for audit only.
+        "requested_timeout": item.get("timeout"),
+        "timeout": None,
+    }
+
+
+def build_request_metas(
+    spec: Dict[str, Any],
+    default_timeout: float = DEFAULT_TIMEOUT,
+) -> List[Dict[str, Any]]:
+    """
+    Build an ordered list of request metas.
+
+    Supported specs:
+
+    1. Explicit requests:
+
+       {
+         "requests": [
+           {"model_id": "bert", "text": "..."},
+           {"kind": "match_game", "model_id": "albert", "premise": "..."}
+         ]
+       }
+
+    2. Shared native request across models:
+
+       {
+         "shared": {"text": "...", "allow_download": false},
+         "models": ["bert", "albert"],
+         "overrides": {"albert": {"top_k": 7}}
+       }
+
+    3. Single native request:
+
+       {"model_id": "bert", "text": "..."}
+
+    4. Single Match Game request:
+
+       {
+         "kind": "match_game",
+         "model_id": "bert",
+         "premise": "...",
+         "mode": "slot"
+       }
+    """
+    if not isinstance(spec, dict):
+        raise ValueError("spec must be a JSON object")
+
+    metas: List[Dict[str, Any]] = []
+
+    if "requests" in spec:
+        requests = spec["requests"]
+        if not isinstance(requests, list):
+            raise ValueError("spec.requests must be an array")
+
+        for item in requests:
+            if not isinstance(item, dict):
+                raise ValueError("each spec.requests item must be an object")
+
+            kind = item.get("kind")
+
+            if kind == "match_game":
+                metas.append(_meta_from_match_game_item(item))
+            elif kind == "native" or "request" in item:
+                metas.append(_meta_from_native_item(item, default_timeout))
+            else:
+                # Infer shape.
+                if "premise" in item and "mode" in item:
+                    metas.append(_meta_from_match_game_item(item))
+                elif "model_id" in item:
+                    metas.append(_meta_from_native_item(item, default_timeout))
+                else:
+                    raise ValueError(
+                        "Could not infer request kind. "
+                        "Native requests need model_id; "
+                        "Match Game requests need model_id, premise, and mode."
+                    )
+
+        return metas
+
+    if "shared" in spec and "models" in spec:
+        shared = dict(spec["shared"])
+        models = spec["models"]
+        overrides = spec.get("overrides") or {}
+
+        if not isinstance(shared, dict):
+            raise ValueError("spec.shared must be an object")
+        if not isinstance(models, list):
+            raise ValueError("spec.models must be an array")
+        if not isinstance(overrides, dict):
+            raise ValueError("spec.overrides must be an object")
+
+        for model_id in models:
+            original = dict(shared)
+            original["model_id"] = model_id
+
+            override = overrides.get(model_id)
+            if override is not None:
+                if not isinstance(override, dict):
+                    raise ValueError(f"spec.overrides[{model_id!r}] must be an object")
+                original.update(override)
+
+            clean = dict(original)
+            clean.pop("kind", None)
+            clean.pop("label", None)
+
+            timeout = _as_float(clean.pop("timeout", None), default_timeout)
+            if timeout is None:
+                timeout = default_timeout
+
+            metas.append(
+                {
+                    "kind": "native",
+                    "label": None,
+                    "request": clean,
+                    "original_input": original,
+                    "timeout": timeout,
+                }
+            )
+
+        return metas
+
+    # Single request convenience.
+    kind = spec.get("kind")
+    if kind == "match_game" or ("premise" in spec and "mode" in spec):
+        return [_meta_from_match_game_item(spec)]
+
+    if "model_id" in spec:
+        return [_meta_from_native_item(spec, default_timeout)]
+
+    raise ValueError(
+        "Could not build requests. "
+        "Provide spec.requests, spec.shared + spec.models, "
+        "a single native request with model_id, "
+        "or a single Match Game request with model_id/premise/mode."
+    )
+
+
+def _requested_input_for_meta(meta: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Return the user-supplied request shape, preserved for audit.
+    """
+    original = meta.get("original_input")
+    if isinstance(original, dict):
+        return dict(original)
+
+    if meta.get("kind") == "match_game":
+        return {
+            "kind": "match_game",
+            "model_id": meta.get("model_id"),
+            "premise": meta.get("premise"),
+            "mode": meta.get("mode", "slot"),
+        }
+
+    return dict(meta.get("request", {}))
+
+
+def _effective_timeout_for_meta(
+    meta: Dict[str, Any],
+    default_timeout: float,
+) -> float:
+    if meta.get("kind") == "match_game":
+        return MATCH_GAME_NATIVE_TIMEOUT
+
+    timeout = meta.get("timeout")
+    if timeout is None:
+        return default_timeout
+
+    value = _as_float(timeout, default_timeout)
+    return default_timeout if value is None else value
+
+
+# ---------------------------------------------------------------------
+# Native dispatch
+# ---------------------------------------------------------------------
+
+def _dispatch_meta(
+    meta: Dict[str, Any],
+    default_timeout: float,
+) -> Tuple[Any, float, Optional[Dict[str, Any]]]:
+    """
+    Call the existing native layer.
+
+    Returns:
+        raw_native_result, effective_timeout, dispatch_input
+
+    dispatch_input is the exact object passed to council.invoke() for native
+    requests. For Match Game requests it is None because panel_input() performs
+    its own framing internally; the user-supplied premise remains in
+    requested_input, and any native framed input appears under raw.input when
+    the worker reaches inference.
+    """
+    if council is None:
+        raise RuntimeError(
+            "council module is unavailable. "
+            f"Import error: {COUNCIL_IMPORT_ERROR!r}"
+        )
+
+    kind = meta.get("kind")
+
+    if kind == "native":
+        request = dict(meta.get("request", {}))
+        timeout = _as_float(meta.get("timeout"), default_timeout)
+        if timeout is None:
+            timeout = default_timeout
+
+        raw = council.invoke(request, timeout=timeout)
+        return raw, timeout, request
+
+    if kind == "match_game":
+        if _match_game is None:
+            raise RuntimeError("match_game module is unavailable")
+
+        raw = _match_game.panel_input(
+            meta["model_id"],
+            meta["premise"],
+            meta.get("mode", "slot"),
+        )
+
+        # panel_input() currently calls invoke(..., timeout=120).
+        return raw, MATCH_GAME_NATIVE_TIMEOUT, None
+
+    raise ValueError(f"Unknown request kind: {kind!r}")
+
+
+# ---------------------------------------------------------------------
+# Normalization
+# ---------------------------------------------------------------------
+
+def _empty_metrics(
+    effective_timeout: Optional[float],
+    wrapper_elapsed: float = 0.0,
+) -> Dict[str, Any]:
+    return {
+        "run_id": None,
+        "created_at": None,
+        "elapsed_seconds": None,
+        "wrapper_elapsed_seconds": _round_seconds(wrapper_elapsed),
+        "effective_timeout": effective_timeout,
+        "tokens_in": None,
+        "tokens_out": None,
+        "total_tokens": None,
+        "input_sha256": None,
+        "lineage": None,
+        "family_year": None,
+        "authenticity": None,
+        "checkpoint": None,
+        "revision": None,
+        "license": None,
+        "device": None,
+        "seed": None,
+        "decoding": None,
+        "diagnostics": None,
+        "ignored_missing_pooler_keys": None,
+    }
+
+
+def _normalize_status(raw_status: Any) -> Tuple[str, bool]:
+    if raw_status is None:
+        return "unknown", False
+
+    lowered = str(raw_status).lower()
+
+    if lowered in SUCCESS_STATUSES:
+        return "success", True
+    if lowered in ERROR_STATUSES:
+        return "error", False
+    if lowered in TIMEOUT_STATUSES:
+        return "timeout", False
+    if lowered in STOPPED_STATUSES:
+        return "stopped", False
+
+    return lowered, False
+
+
+def _task_for_meta(
+    meta: Dict[str, Any],
+    raw_dict: Optional[Dict[str, Any]] = None,
+    model_id: Optional[str] = None,
+) -> Optional[str]:
+    if meta.get("kind") == "match_game":
+        return "match_game"
+
+    if model_id and council is not None:
+        models = getattr(council, "MODELS", {})
+        if isinstance(models, dict) and model_id in models:
+            task = models[model_id].get("task")
+            if task:
+                return task
+
+    if isinstance(raw_dict, dict):
+        output = raw_dict.get("output")
+        if isinstance(output, dict):
+            kind = output.get("kind")
+            if kind:
+                return kind
+
+    return None
+
+
+def _normalize_raw(
+    raw: Any,
+    meta: Dict[str, Any],
+    index: int,
+    request_id: str,
+    requested_input: Dict[str, Any],
+    dispatch_input: Optional[Dict[str, Any]],
+    effective_timeout: float,
+    wrapper_elapsed: float,
+) -> Dict[str, Any]:
+    """
+    Normalize a native result while preserving the complete native record.
+    """
+    if isinstance(raw, dict):
+        raw_dict = raw
+        raw_preserved = raw
+    else:
+        raw_dict = {
+            "status": "error",
+            "error": "native result was not a dict",
+        }
+        raw_preserved = raw
+
+    status_raw = raw_dict.get("status")
+    status, ok = _normalize_status(status_raw)
+
+    output = raw_dict.get("output")
+    panel = raw_dict.get("panel") if isinstance(raw_dict.get("panel"), dict) else None
+    provenance = (
+        raw_dict.get("provenance")
+        if isinstance(raw_dict.get("provenance"), dict)
+        else None
+    )
+
+    metrics = _empty_metrics(effective_timeout, wrapper_elapsed)
+
+    metrics.update(
+        {
+            "run_id": raw_dict.get("run_id"),
+            "created_at": raw_dict.get("created_at"),
+            "elapsed_seconds": raw_dict.get("elapsed_seconds"),
+            "input_sha256": raw_dict.get("input_sha256"),
+            "lineage": raw_dict.get("lineage"),
+            "family_year": raw_dict.get("family_year"),
+            "authenticity": raw_dict.get("authenticity"),
+            "diagnostics": raw_dict.get("diagnostics"),
+        }
+    )
+
+    if provenance is not None:
+        metrics.update(
+            {
+                "tokens_in": provenance.get("input_tokens"),
+                "checkpoint": provenance.get("checkpoint"),
+                "revision": provenance.get("revision"),
+                "license": provenance.get("license"),
+                "device": provenance.get("device"),
+                "seed": provenance.get("seed"),
+                "decoding": provenance.get("decoding"),
+                "ignored_missing_pooler_keys": provenance.get(
+                    "ignored_missing_pooler_keys"
+                ),
+            }
+        )
+
+    if isinstance(output, dict) and "token_count" in output:
+        metrics["tokens_out"] = output.get("token_count")
+
+    if metrics["tokens_in"] is not None and metrics["tokens_out"] is not None:
+        try:
+            metrics["total_tokens"] = int(metrics["tokens_in"]) + int(
+                metrics["tokens_out"]
+            )
+        except Exception:
+            metrics["total_tokens"] = None
+
+    stop_phase = raw_dict.get("stop_phase") if status == "stopped" else None
+    if stop_phase is not None:
+        stop_phase_source = "native"
+    elif status == "stopped":
+        stop_phase_source = "unknown"
+    else:
+        stop_phase_source = None
+
+    stop_source = raw_dict.get("stop_source")
+
+    error = None
+    if not ok:
+        error = {
+            "type": status,
+            "message": raw_dict.get("error"),
+            "error_type": raw_dict.get("error_type"),
+            "stage": raw_dict.get("stage"),
+            "native_status": status_raw,
+        }
+
+    model_id = raw_dict.get("model_id")
+    if model_id is None and isinstance(requested_input, dict):
+        model_id = requested_input.get("model_id")
+
+    task = _task_for_meta(meta, raw_dict, model_id)
+    effective_input = raw_dict.get("input")
+
+    return {
+        "index": index,
+        "request_id": request_id,
+        "kind": meta.get("kind"),
+        "label": meta.get("label"),
+        "ok": ok,
+        "status": status,
+        "attempted": True,
+        "stop_phase": stop_phase,
+        "stop_phase_source": stop_phase_source,
+        "stop_source": stop_source,
+        "model_id": model_id,
+        "task": task,
+        "requested_input": requested_input,
+        "dispatch_input": dispatch_input,
+        "effective_input": effective_input,
+        "effective_timeout": effective_timeout,
+        "output": output,
+        "panel": panel,
+        "provenance": provenance,
+        "metrics": metrics,
+        "error": error,
+        "raw": raw_preserved,
+    }
+
+
+def _exception_item(
+    exc: BaseException,
+    meta: Dict[str, Any],
+    index: int,
+    request_id: str,
+    requested_input: Dict[str, Any],
+    effective_timeout: float,
+    wrapper_elapsed: float,
+) -> Dict[str, Any]:
+    """
+    Normalize a preflight or dispatch exception at the wrapper boundary.
+    """
+    raw = {
+        "status": "error",
+        "exception_class": exc.__class__.__name__,
+        "message": str(exc),
+    }
+
+    metrics = _empty_metrics(effective_timeout, wrapper_elapsed)
+
+    error = {
+        "type": "error",
+        "message": str(exc),
+        "error_type": exc.__class__.__name__,
+        "stage": "wrapper_boundary",
+        "native_status": None,
+    }
+
+    model_id = None
+    if isinstance(requested_input, dict):
+        model_id = requested_input.get("model_id")
+
+    return {
+        "index": index,
+        "request_id": request_id,
+        "kind": meta.get("kind"),
+        "label": meta.get("label"),
+        "ok": False,
+        "status": "error",
+        "attempted": True,
+        "stop_phase": None,
+        "stop_phase_source": None,
+        "stop_source": None,
+        "model_id": model_id,
+        "task": _task_for_meta(meta, None, model_id),
+        "requested_input": requested_input,
+        "dispatch_input": None,
+        "effective_input": None,
+        "effective_timeout": effective_timeout,
+        "output": None,
+        "panel": None,
+        "provenance": None,
+        "metrics": metrics,
+        "error": error,
+        "raw": raw,
+    }
+
+
+def _wrapper_stop_item(
+    meta: Dict[str, Any],
+    index: int,
+    request_id: str,
+    phase: str,
+    source: Optional[str],
+    attempted: bool,
+    status: str,
+    effective_timeout: float,
+    requested_input: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Create a wrapper-owned stopped/unattempted record.
+
+    Phases:
+      - before_call: wrapper observed stop before first native dispatch and
+        chose not to launch native supervision, or native equivalent.
+      - between_calls: wrapper observed stop after a prior attempt and before
+        launching the next native call.
+      - unattempted: remaining batch items after STOP.
+    """
+    if status == "unattempted":
+        message = "batch stopped before this request was attempted"
+        raw_status = "unattempted"
+    else:
+        message = "wrapper observed stop before native invocation"
+        raw_status = "stopped"
+
+    raw = {
+        "status": raw_status,
+        "stop_phase": phase,
+        "stop_source": source,
+        "attempted": attempted,
+        "error": message,
+    }
+
+    metrics = _empty_metrics(effective_timeout, 0.0)
+
+    error = {
+        "type": status,
+        "message": message,
+        "error_type": None,
+        "stage": "wrapper_stop_accounting",
+        "native_status": raw_status,
+    }
+
+    model_id = None
+    if isinstance(requested_input, dict):
+        model_id = requested_input.get("model_id")
+
+    return {
+        "index": index,
+        "request_id": request_id,
+        "kind": meta.get("kind"),
+        "label": meta.get("label"),
+        "ok": False,
+        "status": status,
+        "attempted": attempted,
+        "stop_phase": phase,
+        "stop_phase_source": "wrapper",
+        "stop_source": source,
+        "model_id": model_id,
+        "task": _task_for_meta(meta, None, model_id),
+        "requested_input": requested_input,
+        "dispatch_input": None,
+        "effective_input": None,
+        "effective_timeout": effective_timeout,
+        "output": None,
+        "panel": None,
+        "provenance": None,
+        "metrics": metrics,
+        "error": error,
+        "raw": raw,
+    }
+
+
+def _count_item(summary: Dict[str, int], item: Dict[str, Any]) -> None:
+    status = item.get("status")
+
+    if status == "success":
+        summary["succeeded"] += 1
+    elif status == "error":
+        summary["errored"] += 1
+    elif status == "timeout":
+        summary["timed_out"] += 1
+    elif status == "stopped":
+        summary["stopped"] += 1
+    elif status == "unattempted":
+        summary["unattempted"] += 1
+    else:
+        summary["unknown"] += 1
+
+
+def _fill_unattempted(
+    metas: List[Dict[str, Any]],
+    start_index: int,
+    results: List[Dict[str, Any]],
+    summary: Dict[str, int],
+    stop_source: Optional[str],
+    default_timeout: float,
+) -> None:
+    for index in range(start_index, len(metas)):
+        meta = metas[index]
+        request_id = _new_id("req")
+        requested_input = _requested_input_for_meta(meta)
+        effective_timeout = _effective_timeout_for_meta(meta, default_timeout)
+
+        item = _wrapper_stop_item(
+            meta=meta,
+            index=index,
+            request_id=request_id,
+            phase="unattempted",
+            source=stop_source,
+            attempted=False,
+            status="unattempted",
+            effective_timeout=effective_timeout,
+            requested_input=requested_input,
+        )
+
+        results.append(item)
+        _count_item(summary, item)
+
+
+# ---------------------------------------------------------------------
+# Batch polling
+# ---------------------------------------------------------------------
+
+def poll_batch(
+    metas: List[Dict[str, Any]],
+    default_timeout: float = DEFAULT_TIMEOUT,
+    stop_check: Optional[Callable[[], bool]] = None,
+) -> Dict[str, Any]:
+    """
+    Serially poll the native engine.
+
+    No retries.
+    Stops on STOP.
+    Preserves prior results when later calls fail or are unattempted.
+    """
+    if council is None:
+        raise RuntimeError(
+            "council module is unavailable. "
+            f"Import error: {COUNCIL_IMPORT_ERROR!r}"
+        )
+
+    results: List[Dict[str, Any]] = []
+
+    summary: Dict[str, int] = {
+        "planned": len(metas),
+        "attempted": 0,
+        "succeeded": 0,
+        "errored": 0,
+        "timed_out": 0,
+        "stopped": 0,
+        "unattempted": 0,
+        "unknown": 0,
+    }
+
+    attempted_any = False
+    stopped = False
+    stop_source: Optional[str] = None
+
+    index = 0
+    while index < len(metas):
+        meta = metas[index]
+        request_id = _new_id("req")
+        requested_input = _requested_input_for_meta(meta)
+        effective_timeout = _effective_timeout_for_meta(meta, default_timeout)
+
+        should_stop, source = _stop_state(stop_check)
+
+        if should_stop:
+            stop_source = source
+
+            if attempted_any:
+                item = _wrapper_stop_item(
+                    meta=meta,
+                    index=index,
+                    request_id=request_id,
+                    phase="between_calls",
+                    source=source,
+                    attempted=False,
+                    status="stopped",
+                    effective_timeout=effective_timeout,
+                    requested_input=requested_input,
+                )
+                results.append(item)
+                _count_item(summary, item)
+                stopped = True
+                break
+
+            # If the native STOP file is present, let council.invoke() produce
+            # its native before_call record. If the stop came only from an
+            # external wrapper signal, do not launch native supervision.
+            if source != "stop_file":
+                item = _wrapper_stop_item(
+                    meta=meta,
+                    index=index,
+                    request_id=request_id,
+                    phase="before_call",
+                    source=source,
+                    attempted=False,
+                    status="stopped",
+                    effective_timeout=effective_timeout,
+                    requested_input=requested_input,
+                )
+                results.append(item)
+                _count_item(summary, item)
+                stopped = True
+                break
+
+        started = time.perf_counter()
+
+        try:
+            raw, effective_timeout, dispatch_input = _dispatch_meta(
+                meta,
+                default_timeout,
+            )
+            elapsed = time.perf_counter() - started
+
+            summary["attempted"] += 1
+            attempted_any = True
+
+            item = _normalize_raw(
+                raw=raw,
+                meta=meta,
+                index=index,
+                request_id=request_id,
+                requested_input=requested_input,
+                dispatch_input=dispatch_input,
+                effective_timeout=effective_timeout,
+                wrapper_elapsed=elapsed,
+            )
+
+        except Exception as exc:
+            elapsed = time.perf_counter() - started
+
+            summary["attempted"] += 1
+            attempted_any = True
+
+            item = _exception_item(
+                exc=exc,
+                meta=meta,
+                index=index,
+                request_id=request_id,
+                requested_input=requested_input,
+                effective_timeout=effective_timeout,
+                wrapper_elapsed=elapsed,
+            )
+
+        results.append(item)
+        _count_item(summary, item)
+
+        if item.get("status") == "stopped":
+            stopped = True
+            stop_source = (
+                item.get("stop_source")
+                or source
+                or "stop_file"
+            )
+            break
+
+        index += 1
+
+    if stopped:
+        _fill_unattempted(
+            metas=metas,
+            start_index=len(results),
+            results=results,
+            summary=summary,
+            stop_source=stop_source,
+            default_timeout=default_timeout,
+        )
+
+    return {
+        "request_id": _new_id("poll"),
+        "generated_at": _utcnow(),
+        "defaults": {
+            "timeout": default_timeout,
+            "serial": True,
+            "retries": 0,
+        },
+        "execution": {
+            "serial": True,
+            "retries": 0,
+            "stopped": stopped,
+            "stop_source": stop_source,
+        },
+        "summary": summary,
+        "results": results,
+    }
+
+
+def poll_old_models(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    High-level entry point for Python hosts and MCP tool handlers.
+    """
+    if council is None:
+        raise RuntimeError(
+            "council module is unavailable. "
+            f"Import error: {COUNCIL_IMPORT_ERROR!r}"
+        )
+
+    spec = dict(payload)
+
+    stop_check = spec.pop("stop_check", None)
+    if stop_check is not None and not callable(stop_check):
+        raise ValueError("payload.stop_check must be callable if provided")
+
+    default_timeout = _as_float(spec.pop("timeout", None), DEFAULT_TIMEOUT)
+    if default_timeout is None:
+        default_timeout = DEFAULT_TIMEOUT
+
+    metas = build_request_metas(spec, default_timeout=default_timeout)
+
+    return poll_batch(
+        metas,
+        default_timeout=default_timeout,
+        stop_check=stop_check,
+    )
+
+
+# ---------------------------------------------------------------------
+# MCP tool definition
+# ---------------------------------------------------------------------
+
+TOOL_NAME = "poll_old_models"
+
+TOOL_DESCRIPTION = (
+    "Poll one or more older/local historical models serially through the "
+    "existing council.invoke() engine, or through match_game.panel_input() for "
+    "Match Game framing. Returns a normalized envelope while preserving each "
+    "native result under raw."
+)
+
+TOOL_INPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "timeout": {
+            "type": "number",
+            "default": DEFAULT_TIMEOUT,
+            "description": (
+                "Default per-invocation timeout for native requests. "
+                "Match Game requests use the native panel_input timeout of 120."
+            ),
+        },
+        "requests": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": (
+                "Explicit ordered list of native or Match Game requests."
+            ),
+        },
+        "shared": {
+            "type": "object",
+            "description": (
+                "Common native request fields applied to every model in models[]."
+            ),
+        },
+        "models": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Model IDs to poll when using shared request fields.",
+        },
+        "overrides": {
+            "type": "object",
+            "additionalProperties": {"type": "object"},
+            "description": "Per-model native request overrides keyed by model_id.",
+        },
+    },
+}
+
+
+def mcp_tool_definition() -> Dict[str, Any]:
+    return {
+        "name": TOOL_NAME,
+        "description": TOOL_DESCRIPTION,
+        "inputSchema": TOOL_INPUT_SCHEMA,
+    }
+
+
+def mcp_handler(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    return poll_old_models(arguments)
+
+
+# ---------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------
+
+def _read_json(path: Optional[str]) -> Dict[str, Any]:
+    if path and path != "-":
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+
+    data = sys.stdin.read()
+    if not data.strip():
+        raise ValueError("No JSON input provided on stdin.")
+
+    return json.loads(data)
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Thin wrapper for polling older/local historical models."
+    )
+    parser.add_argument(
+        "--input",
+        "-i",
+        default="-",
+        help="JSON spec file, or - for stdin.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        help="Override default timeout seconds for native requests.",
+    )
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Print compact JSON.",
+    )
+
+    args = parser.parse_args(argv)
+
+    try:
+        spec = _read_json(args.input)
+        if args.timeout is not None:
+            spec["timeout"] = args.timeout
+
+        envelope = poll_old_models(spec)
+
+    except Exception as exc:
+        envelope = {
+            "request_id": _new_id("poll_error"),
+            "generated_at": _utcnow(),
+            "defaults": {
+                "timeout": None,
+                "serial": True,
+                "retries": 0,
+            },
+            "execution": {
+                "serial": True,
+                "retries": 0,
+                "stopped": False,
+                "stop_source": None,
+            },
+            "summary": {
+                "planned": 0,
+                "attempted": 0,
+                "succeeded": 0,
+                "errored": 1,
+                "timed_out": 0,
+                "stopped": 0,
+                "unattempted": 0,
+                "unknown": 0,
+            },
+            "results": [],
+            "error": {
+                "type": exc.__class__.__name__,
+                "message": str(exc),
+            },
+        }
+        print(json.dumps(envelope, indent=2, sort_keys=True, default=str))
+        return 2
+
+    summary = envelope.get("summary", {})
+
+    # Controlled STOP is not treated as a wrapper failure.
+    # Errors, timeouts, and unknown statuses are failures.
+    failed = (
+        summary.get("errored", 0)
+        + summary.get("timed_out", 0)
+        + summary.get("unknown", 0)
+    )
+
+    separators = (",", ":") if args.compact else None
+    indent = None if args.compact else 2
+
+    print(
+        json.dumps(
+            envelope,
+            indent=indent,
+            separators=separators,
+            sort_keys=True,
+            default=str,
+        )
+    )
+
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

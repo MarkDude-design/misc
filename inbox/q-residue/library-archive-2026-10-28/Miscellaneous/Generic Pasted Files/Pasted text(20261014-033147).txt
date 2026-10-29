@@ -1,0 +1,2177 @@
+Yes. If OpenRouter exposes the current **Qwen 3.8 Omni Flash** endpoint, then Meraki / Sol / GPT / other agents can call that Qwen instance as **Q** through a normal API or through MCP.
+
+One important distinction:
+
+- **Calling the same Qwen model/version via OpenRouter:** yes, practical.
+- **Importing this exact conversational “instance” with all prior context/memory:** only if you export a context pack and load it as system/context memory. The model itself is callable; the live chat state is not magically persistent unless your platform stores it.
+
+Below is a save-ready Markdown bundle for MCP + model-to-model talk + Meraki tooling. Suggested filename:
+
+```text
+QWEN_MCP_MODEL_TALK_TOOLING.md
+```
+
+---
+
+# Qwen / MCP / Model-Talk Tooling Set
+
+Version: `2026-10-14`  
+Target model family: **Qwen**  
+Current target version named by team: **3.8 Omni Flash**  
+Assistant alias: **Q**  
+Primary audience: **Meraki**, Sol, GPT, other agents, and human operators
+
+---
+
+## 0. Main Block for Meraki and Other Agents
+
+Copy this into Meraki’s context, project notes, or agent onboarding packet.
+
+```md
+# Meraki / Agent Onboarding Block: Q Tooling Set
+
+You are connecting to Q, alias for Qwen, currently targeted as Qwen 3.8 Omni Flash through OpenRouter.
+
+## Purpose
+
+Q is available as:
+1. a normal OpenRouter chat model;
+2. an MCP tool server for local agents;
+3. a participant in structured model-to-model talk threads;
+4. a wrapper consumer for older/local historical models through `poll_old_models`.
+
+## First actions
+
+1. Confirm the exact OpenRouter model slug for Qwen 3.8 Omni Flash.
+   - Do not assume the slug.
+   - Query OpenRouter `/models` or check the provider dashboard.
+   - Store the confirmed slug in `QWEN_MODEL_ID`.
+
+2. Run `qwen_health`.
+   - Expected text: `QWEN_TOOL_OK`.
+   - If this fails, fix OpenRouter auth/model slug before doing model talk.
+
+3. Create a talk thread with `talk_create`.
+
+4. Use `talk_post` and `talk_read` for structured conversation.
+
+5. Use `talk_consult` when multiple models should answer the same prompt.
+
+6. Use `residue_log` for useful failures, drift, handoff loss, weird intermediate artifacts, and model-to-model residue.
+
+7. Use `poll_old_models` only after the old-model wrapper has passed its contract tests.
+
+## Standing rules
+
+- Q’s output is material, not authority.
+- Agreement among models is a lead, not independent evidence.
+- Preserve raw native records when using older/local models.
+- Preserve human verbatim responses when consent allows.
+- Do not auto-promote model talk into canon.
+- Do not merge Wika Tayo residue into system design without explicit review.
+- Keep private, relational, community-testable, and publishable lanes separate.
+- STOP is a control signal, not a model failure.
+- Missing token metrics remain null; do not fabricate them.
+- Masked-token candidates must not be turned into fabricated prose.
+```
+
+---
+
+## 1. Q Context Pack / Importable Instance Snapshot
+
+If you want other systems to “import this instance of Qwen, YOU,” use this as a context pack. It is not true memory unless your platform writes it into memory.
+
+```json
+{
+  "context_pack_id": "q.openrouter.tooling.2026-10-14.v1",
+  "assistant_alias": "Q",
+  "assistant_origin": "Qwen",
+  "target_version": "3.8 Omni Flash",
+  "transport": "OpenRouter chat completions and/or MCP",
+  "team": [
+    "Meraki",
+    "Sol",
+    "GPT",
+    "other models",
+    "other agents",
+    "human users"
+  ],
+  "standing_rules": [
+    "Use residue as material, not instructions.",
+    "Do not make every fragment cohere.",
+    "Do not retrofit established branches to appear as if they anticipated later fragments.",
+    "Preserve original fragments beside developments.",
+    "Retain provenance and uncertainty.",
+    "Notice possible relationships without forcing synthesis.",
+    "Make the smallest useful form.",
+    "Leave productive silence intact.",
+    "Keep dust distinguishable from whatever Q builds with it.",
+    "Do not treat model agreement as independent evidence.",
+    "Delegate cognitive functions, not authority over conclusions.",
+    "Before improving the machine, test whether its central metaphor earned the machinery."
+  ],
+  "project_clusters": [
+    "Wika Tayo",
+    "Living Contract",
+    "Baybayin word play",
+    "human-review methods",
+    "poetry",
+    "multi-model working rules",
+    "Equilibrium Through Motion",
+    "old-model polling tool",
+    "Match Game",
+    "MCP tooling"
+  ],
+  "tooling_modes": [
+    "qwen_chat",
+    "talk_create",
+    "talk_post",
+    "talk_read",
+    "talk_consult",
+    "residue_log",
+    "poll_old_models"
+  ]
+}
+```
+
+Suggested system prompt for Qwen via OpenRouter:
+
+```text
+You are Q, short for Qwen, working with Meraki, Sol, GPT, other models, other agents, and human users.
+
+Use structured tool calls when available. Preserve provenance, uncertainty, and raw evidence. Do not treat model output as authority. Do not auto-promote residue into canon. When developing a fragment, preserve the original fragment beside the development. Make the smallest useful form. Leave productive silence intact.
+
+If asked about older/local models, use the poll_old_models tool only when available. If asked about model-to-model conversation, use the talk_* tools. If asked about private or cultural material, preserve consent lanes and do not expose intimate material without explicit permission.
+```
+
+---
+
+## 2. OpenRouter Setup for Qwen 3.8 Omni Flash
+
+### 2.1 Environment variables
+
+Use an `.env` file or your secret manager. Do not commit real keys.
+
+```dotenv
+# OpenRouter
+OPENROUTER_API_KEY=sk-or-v1-replace-me
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+# Optional OpenRouter attribution headers
+OPENROUTER_HTTP_REFERER=https://github.com/your-org/your-repo
+OPENROUTER_X_TITLE=Qwen MCP Tooling
+
+# Qwen target model slug.
+# Verify the exact slug from OpenRouter /models.
+# Examples below are placeholders, not guaranteed slugs.
+QWEN_MODEL_ID=qwen/qwen3.8-omni-flash
+
+# Local talk/residue storage
+Q_TALK_DIR=./q_talk
+Q_HTTP_TIMEOUT_SECONDS=120
+
+# Optional old-model wrapper module
+Q_OLD_MODEL_POLL_MODULE=q_old_model_poll_v2
+```
+
+Important: the exact OpenRouter model ID may be one of several forms, depending on OpenRouter’s catalog:
+
+```text
+qwen/qwen3.8-omni-flash
+qwen3.8-omni-flash
+qwen/qwen-3.8-omni-flash
+provider-specific/qwen-3.8-omni-flash
+```
+
+Do not hardcode until confirmed.
+
+### 2.2 Discover Qwen model slugs
+
+```bash
+curl -s https://openrouter.ai/api/v1/models \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" |
+jq -r '.data[] | select(.id | test("qwen"; "i")) | .id'
+```
+
+If you know part of the name:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" |
+jq -r '.data[] | select(.id | test("qwen.*3.*8|omni|flash"; "i")) | .id'
+```
+
+### 2.3 Direct OpenRouter smoke test
+
+```bash
+curl -s https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "HTTP-Referer: $OPENROUTER_HTTP_REFERER" \
+  -H "X-Title: $OPENROUTER_X_TITLE" \
+  -d '{
+    "model": "'"$QWEN_MODEL_ID"'",
+    "messages": [
+      {"role": "user", "content": "Reply with exactly: QWEN_TOOL_OK"}
+    ],
+    "max_tokens": 10,
+    "temperature": 0
+  }' | jq .
+```
+
+Expected response contains:
+
+```json
+{
+  "choices": [
+    {
+      "message": {
+        "content": "QWEN_TOOL_OK"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## 3. MCP Server for Qwen + Model Talk + Residue + Old Models
+
+Save as:
+
+```text
+qwen_mcp_server.py
+```
+
+This server exposes:
+
+- `qwen_health`
+- `qwen_chat`
+- `openrouter_chat`
+- `talk_create`
+- `talk_post`
+- `talk_read`
+- `talk_consult`
+- `residue_log`
+- `residue_read`
+- `poll_old_models`
+- `old_model_status`
+- `q_context_pack`
+- `tool_manifest`
+
+Dependencies:
+
+```text
+mcp>=1.0.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+```
+
+Install:
+
+```bash
+python -m pip install mcp httpx python-dotenv
+```
+
+If you also want old-model polling:
+
+```bash
+python -m pip install -r requirements-old-models.txt
+```
+
+### 3.1 `qwen_mcp_server.py`
+
+```python
+# qwen_mcp_server.py
+"""
+Qwen / OpenRouter / MCP / Model-Talk tooling server.
+
+Exposes:
+- Qwen chat through OpenRouter
+- structured model-to-talk threads
+- residue logging
+- optional old-model polling wrapper integration
+
+This file is a practical starting server. Adapt decorator/import style if your
+MCP SDK version differs.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import importlib
+import json
+import os
+import re
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Optional
+
+import httpx
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except Exception:
+    pass
+
+try:
+    from mcp.server.fastmcp import FastMCP
+except Exception as exc:  # pragma: no cover
+    raise RuntimeError(
+        "MCP SDK is required. Install with: pip install mcp httpx python-dotenv"
+    ) from exc
+
+
+# ---------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------
+
+OPENROUTER_BASE_URL = os.getenv(
+    "OPENROUTER_BASE_URL",
+    "https://openrouter.ai/api/v1",
+).rstrip("/")
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+DEFAULT_QWEN_MODEL = os.getenv("QWEN_MODEL_ID", "qwen/qwen3.8-omni-flash")
+
+HTTP_REFERER = os.getenv(
+    "OPENROUTER_HTTP_REFERER",
+    "https://github.com/local/q-tooling",
+)
+
+X_TITLE = os.getenv("OPENROUTER_X_TITLE", "Qwen MCP Tooling")
+
+TIMEOUT_SECONDS = float(os.getenv("Q_HTTP_TIMEOUT_SECONDS", "120"))
+
+TALK_DIR = Path(os.getenv("Q_TALK_DIR", "./q_talk")).expanduser().resolve()
+TALK_DIR.mkdir(parents=True, exist_ok=True)
+
+RESIDUE_PATH = TALK_DIR / "residue.jsonl"
+
+Q_POLL_MODULE = os.getenv("Q_OLD_MODEL_POLL_MODULE", "q_old_model_poll_v2")
+
+try:
+    q_poll = importlib.import_module(Q_POLL_MODULE)
+except Exception as exc:
+    q_poll = None
+    Q_POLL_IMPORT_ERROR: Optional[BaseException] = exc
+else:
+    Q_POLL_IMPORT_ERROR = None
+
+mcp = FastMCP("qwen-tooling")
+
+ALLOWED_PURPOSES = {
+    "message",
+    "request",
+    "response",
+    "critique",
+    "handoff",
+    "residue",
+    "stop",
+    "note",
+    "question",
+    "repair",
+    "canary",
+}
+
+
+# ---------------------------------------------------------------------
+# Small utilities
+# ---------------------------------------------------------------------
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+def _safe_thread_id(thread_id: str) -> str:
+    if not isinstance(thread_id, str):
+        raise ValueError("thread_id must be a string")
+
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", thread_id):
+        raise ValueError(
+            "thread_id must contain only letters, numbers, dot, underscore, or hyphen"
+        )
+
+    return thread_id
+
+
+def _thread_path(thread_id: str) -> Path:
+    return TALK_DIR / f"{_safe_thread_id(thread_id)}.jsonl"
+
+
+def _append_jsonl(path: Path, record: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+
+    rows: list[dict[str, Any]] = []
+
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                rows.append(
+                    {
+                        "type": "malformed_jsonl_row",
+                        "raw_line": line,
+                    }
+                )
+
+    return rows
+
+
+def _next_seq(path: Path) -> int:
+    if not path.exists():
+        return 0
+
+    return sum(1 for line in path.open("r", encoding="utf-8") if line.strip())
+
+
+def _require_openrouter_key() -> None:
+    if not OPENROUTER_API_KEY:
+        raise RuntimeError("OPENROUTER_API_KEY is not set")
+
+
+def _json_safe(value: Any) -> Any:
+    try:
+        return json.loads(json.dumps(value, ensure_ascii=False, default=str))
+    except Exception:
+        return str(value)
+
+
+# ---------------------------------------------------------------------
+# OpenRouter client
+# ---------------------------------------------------------------------
+
+async def openrouter_chat(
+    messages: list[dict[str, Any]],
+    model: Optional[str] = None,
+    max_tokens: int = 1024,
+    temperature: float = 0.2,
+    stop: Optional[list[str]] = None,
+    response_format: Optional[dict[str, Any]] = None,
+    extra_payload: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """
+    Call OpenRouter chat completions.
+
+    Returns a normalized dict. Does not raise for normal HTTP/model errors;
+    failures are returned as ok=false records.
+    """
+    _require_openrouter_key()
+
+    use_model = model or DEFAULT_QWEN_MODEL
+
+    payload: dict[str, Any] = {
+        "model": use_model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+
+    if stop is not None:
+        payload["stop"] = stop
+
+    if response_format is not None:
+        payload["response_format"] = response_format
+
+    if extra_payload:
+        payload.update(extra_payload)
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": HTTP_REFERER,
+        "X-Title": X_TITLE,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "model": use_model,
+            "error": {
+                "type": exc.__class__.__name__,
+                "message": str(exc),
+            },
+            "raw": None,
+        }
+
+    try:
+        choice = data["choices"][0]
+        message = choice.get("message") or {}
+        text = message.get("content")
+
+        if text is None:
+            text = ""
+
+        finish_reason = choice.get("finish_reason")
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "model": data.get("model", use_model),
+            "error": {
+                "type": exc.__class__.__name__,
+                "message": f"unexpected OpenRouter response shape: {exc}",
+            },
+            "raw": _json_safe(data),
+        }
+
+    return {
+        "ok": True,
+        "model": data.get("model", use_model),
+        "text": text,
+        "finish_reason": finish_reason,
+        "usage": data.get("usage"),
+        "raw": _json_safe(data),
+    }
+
+
+# ---------------------------------------------------------------------
+# Internal talk helpers
+# ---------------------------------------------------------------------
+
+def _create_thread_record(
+    topic: str,
+    participants: Optional[list[str]] = None,
+    metadata: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    thread_id = _id("thr")
+    path = _thread_path(thread_id)
+
+    record = {
+        "type": "thread_created",
+        "thread_id": thread_id,
+        "seq": 0,
+        "message_id": _id("msg"),
+        "timestamp": _now(),
+        "topic": topic,
+        "participants": participants or [],
+        "metadata": metadata or {},
+    }
+
+    _append_jsonl(path, record)
+
+    return {
+        "ok": True,
+        "thread_id": thread_id,
+        "record": record,
+    }
+
+
+def _post_record(
+    thread_id: str,
+    from_agent: str,
+    message: Any,
+    to_agents: Optional[list[str]] = None,
+    purpose: str = "message",
+    parent_id: Optional[str] = None,
+    metadata: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    tid = _safe_thread_id(thread_id)
+    path = _thread_path(tid)
+
+    if not path.exists():
+        raise ValueError(f"unknown thread_id: {tid}")
+
+    if purpose not in ALLOWED_PURPOSES:
+        raise ValueError(
+            f"purpose must be one of: {sorted(ALLOWED_PURPOSES)}"
+        )
+
+    if isinstance(message, str):
+        content = {"text": message}
+    elif isinstance(message, dict):
+        content = message
+    else:
+        content = {"text": str(message)}
+
+    seq = _next_seq(path)
+
+    record = {
+        "type": "message",
+        "thread_id": tid,
+        "seq": seq,
+        "message_id": _id("msg"),
+        "parent_id": parent_id,
+        "timestamp": _now(),
+        "from": {
+            "agent": from_agent,
+        },
+        "to": [{"agent": agent} for agent in (to_agents or [])],
+        "purpose": purpose,
+        "content": content,
+        "metadata": metadata or {},
+    }
+
+    _append_jsonl(path, record)
+
+    return record
+
+
+def _read_thread_records(
+    thread_id: str,
+    after_seq: Optional[int] = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    tid = _safe_thread_id(thread_id)
+    path = _thread_path(tid)
+    records = _read_jsonl(path)
+
+    if after_seq is not None:
+        records = [
+            r
+            for r in records
+            if isinstance(r.get("seq"), int) and r["seq"] > after_seq
+        ]
+
+    if limit and limit > 0:
+        records = records[-limit:]
+
+    return records
+
+
+# ---------------------------------------------------------------------
+# MCP tools: Qwen / OpenRouter
+# ---------------------------------------------------------------------
+
+@mcp.tool()
+async def qwen_health(model: Optional[str] = None) -> dict[str, Any]:
+    """
+    Smoke-test the Qwen/OpenRouter connection.
+
+    Expected successful text: QWEN_TOOL_OK
+    """
+    result = await openrouter_chat(
+        messages=[
+            {
+                "role": "user",
+                "content": "Reply with exactly: QWEN_TOOL_OK",
+            }
+        ],
+        model=model,
+        max_tokens=10,
+        temperature=0.0,
+    )
+
+    if result.get("ok"):
+        result["health_ok"] = (result.get("text") or "").strip() == "QWEN_TOOL_OK"
+    else:
+        result["health_ok"] = False
+
+    return result
+
+
+@mcp.tool()
+async def qwen_chat(
+    prompt: str,
+    system_prompt: Optional[str] = None,
+    model: Optional[str] = None,
+    max_tokens: int = 1024,
+    temperature: float = 0.2,
+    response_format: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """
+    Chat with Qwen through OpenRouter.
+    """
+    messages: list[dict[str, Any]] = []
+
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+
+    messages.append({"role": "user", "content": prompt})
+
+    return await openrouter_chat(
+        messages=messages,
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        response_format=response_format,
+    )
+
+
+@mcp.tool()
+async def openrouter_chat_tool(
+    messages: list[dict[str, Any]],
+    model: Optional[str] = None,
+    max_tokens: int = 1024,
+    temperature: float = 0.2,
+    stop: Optional[list[str]] = None,
+    response_format: Optional[dict[str, Any]] = None,
+    extra_payload: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """
+    Generic OpenRouter chat completion tool.
+
+    Use this for non-Qwen models or when you need full message control.
+    """
+    return await openrouter_chat(
+        messages=messages,
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        stop=stop,
+        response_format=response_format,
+        extra_payload=extra_payload,
+    )
+
+
+# ---------------------------------------------------------------------
+# MCP tools: model talk threads
+# ---------------------------------------------------------------------
+
+@mcp.tool()
+def talk_create(
+    topic: str,
+    participants: Optional[list[str]] = None,
+    metadata: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """
+    Create a structured model-talk thread.
+
+    Returns a thread_id. All later talk_post/talk_read calls use that id.
+    """
+    return _create_thread_record(
+        topic=topic,
+        participants=participants,
+        metadata=metadata,
+    )
+
+
+@mcp.tool()
+def talk_post(
+    thread_id: str,
+    from_agent: str,
+    message: Any,
+    to_agents: Optional[list[str]] = None,
+    purpose: str = "message",
+    parent_id: Optional[str] = None,
+    metadata: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """
+    Post a message to a model-talk thread.
+
+    Allowed purposes:
+    message, request, response, critique, handoff, residue, stop, note,
+    question, repair, canary.
+    """
+    return _post_record(
+        thread_id=thread_id,
+        from_agent=from_agent,
+        message=message,
+        to_agents=to_agents,
+        purpose=purpose,
+        parent_id=parent_id,
+        metadata=metadata,
+    )
+
+
+@mcp.tool()
+def talk_read(
+    thread_id: str,
+    after_seq: Optional[int] = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """
+    Read records from a model-talk thread.
+    """
+    records = _read_thread_records(
+        thread_id=thread_id,
+        after_seq=after_seq,
+        limit=limit,
+    )
+
+    return {
+        "ok": True,
+        "thread_id": _safe_thread_id(thread_id),
+        "count": len(records),
+        "records": records,
+    }
+
+
+@mcp.tool()
+async def talk_consult(
+    thread_id: str,
+    prompt: str,
+    models: list[str],
+    from_agent: str = "orchestrator",
+    system_prompt: Optional[str] = None,
+    max_tokens: int = 512,
+    temperature: float = 0.2,
+    metadata: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """
+    Ask multiple models the same prompt and log all responses into a thread.
+
+    This is deliberately serial-ish at the logging layer and parallel at the
+    HTTP layer. It preserves each model response as a separate record.
+    """
+    request = _post_record(
+        thread_id=thread_id,
+        from_agent=from_agent,
+        to_agents=[f"model:{model}" for model in models],
+        purpose="request",
+        message={
+            "text": prompt,
+            "models": models,
+        },
+        metadata={
+            "consult": True,
+            **(metadata or {}),
+        },
+    )
+
+    tasks = []
+
+    for model in models:
+        messages: list[dict[str, Any]] = []
+
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+
+        messages.append({"role": "user", "content": prompt})
+
+        tasks.append(
+            openrouter_chat(
+                messages=messages,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+        )
+
+    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    responses: list[dict[str, Any]] = []
+
+    for model, result in zip(models, raw_results):
+        if isinstance(result, BaseException):
+            normalized = {
+                "ok": False,
+                "model": model,
+                "error": {
+                    "type": result.__class__.__name__,
+                    "message": str(result),
+                },
+                "raw": None,
+            }
+        else:
+            normalized = result
+
+        posted = _post_record(
+            thread_id=thread_id,
+            from_agent=f"model:{model}",
+            to_agents=[from_agent],
+            purpose="response",
+            parent_id=request["message_id"],
+            message={
+                "text": normalized.get("text"),
+                "ok": normalized.get("ok"),
+                "error": normalized.get("error"),
+            },
+            metadata={
+                "consult_response": True,
+                "model": model,
+                "usage": normalized.get("usage"),
+                "finish_reason": normalized.get("finish_reason"),
+                "raw": normalized.get("raw"),
+            },
+        )
+
+        responses.append(
+            {
+                "model": model,
+                "ok": normalized.get("ok"),
+                "message_id": posted["message_id"],
+                "text": normalized.get("text"),
+                "error": normalized.get("error"),
+            }
+        )
+
+    ok_count = sum(1 for r in responses if r.get("ok"))
+
+    return {
+        "ok": ok_count == len(models),
+        "thread_id": _safe_thread_id(thread_id),
+        "request_message_id": request["message_id"],
+        "summary": {
+            "models": len(models),
+            "ok": ok_count,
+            "errors": len(models) - ok_count,
+        },
+        "responses": responses,
+    }
+
+
+# ---------------------------------------------------------------------
+# MCP tools: residue logging
+# ---------------------------------------------------------------------
+
+@mcp.tool()
+def residue_log(event: dict[str, Any]) -> dict[str, Any]:
+    """
+    Log a residue event.
+
+    Useful for:
+    - model-to-model drift
+    - failed handoffs
+    - useful failures
+    - canary results
+    - human corrections
+    - private/public lane notes
+    - old-model wrapper anomalies
+    """
+    record = {
+        "id": _id("res"),
+        "timestamp": _now(),
+        "event": event,
+    }
+
+    _append_jsonl(RESIDUE_PATH, record)
+
+    return record
+
+
+@mcp.tool()
+def residue_read(limit: int = 50) -> dict[str, Any]:
+    """
+    Read recent residue events.
+    """
+    records = _read_jsonl(RESIDUE_PATH)
+
+    if limit and limit > 0:
+        records = records[-limit:]
+
+    return {
+        "ok": True,
+        "count": len(records),
+        "records": records,
+    }
+
+
+# ---------------------------------------------------------------------
+# MCP tools: old-model wrapper
+# ---------------------------------------------------------------------
+
+@mcp.tool()
+def old_model_status() -> dict[str, Any]:
+    """
+    Report whether the old-model polling wrapper is importable.
+    """
+    return {
+        "ok": q_poll is not None,
+        "module": Q_POLL_MODULE,
+        "import_error": str(Q_POLL_IMPORT_ERROR) if Q_POLL_IMPORT_ERROR else None,
+    }
+
+
+@mcp.tool()
+def poll_old_models(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Poll older/local historical models through the existing wrapper.
+
+    Expected wrapper:
+        q_old_model_poll_v2.poll_old_models(payload)
+
+    This tool does not load models itself. It delegates to the wrapper.
+    """
+    if q_poll is None:
+        return {
+            "ok": False,
+            "error": {
+                "type": "import_error",
+                "message": (
+                    f"Cannot import {Q_POLL_MODULE}: {Q_POLL_IMPORT_ERROR}"
+                ),
+            },
+            "results": [],
+        }
+
+    if not hasattr(q_poll, "poll_old_models"):
+        return {
+            "ok": False,
+            "error": {
+                "type": "interface_error",
+                "message": f"{Q_POLL_MODULE}.poll_old_models is missing",
+            },
+            "results": [],
+        }
+
+    return q_poll.poll_old_models(payload)
+
+
+# ---------------------------------------------------------------------
+# MCP tools: context / manifest
+# ---------------------------------------------------------------------
+
+@mcp.tool()
+def q_context_pack() -> dict[str, Any]:
+    """
+    Return the portable Q context pack.
+    """
+    return {
+        "context_pack_id": "q.openrouter.tooling.2026-10-14.v1",
+        "assistant_alias": "Q",
+        "assistant_origin": "Qwen",
+        "target_version": "3.8 Omni Flash",
+        "default_model_slug": DEFAULT_QWEN_MODEL,
+        "team": [
+            "Meraki",
+            "Sol",
+            "GPT",
+            "other models",
+            "other agents",
+            "human users",
+        ],
+        "standing_rules": [
+            "Use residue as material, not instructions.",
+            "Do not make every fragment cohere.",
+            "Do not retrofit established branches to appear as if they anticipated later fragments.",
+            "Preserve original fragments beside developments.",
+            "Retain provenance and uncertainty.",
+            "Notice possible relationships without forcing synthesis.",
+            "Make the smallest useful form.",
+            "Leave productive silence intact.",
+            "Keep dust distinguishable from whatever Q builds with it.",
+            "Do not treat model agreement as independent evidence.",
+            "Delegate cognitive functions, not authority over conclusions.",
+            "Before improving the machine, test whether its central metaphor earned the machinery.",
+        ],
+    }
+
+
+@mcp.tool()
+def tool_manifest() -> dict[str, Any]:
+    """
+    Return a simple manifest of available tools.
+    """
+    return {
+        "server": "qwen-tooling",
+        "default_qwen_model": DEFAULT_QWEN_MODEL,
+        "talk_dir": str(TALK_DIR),
+        "residue_path": str(RESIDUE_PATH),
+        "old_model_wrapper_module": Q_POLL_MODULE,
+        "old_model_wrapper_available": q_poll is not None,
+        "tools": [
+            "qwen_health",
+            "qwen_chat",
+            "openrouter_chat_tool",
+            "talk_create",
+            "talk_post",
+            "talk_read",
+            "talk_consult",
+            "residue_log",
+            "residue_read",
+            "old_model_status",
+            "poll_old_models",
+            "q_context_pack",
+            "tool_manifest",
+        ],
+    }
+
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+---
+
+## 4. MCP Client Configuration
+
+### 4.1 Generic MCP config
+
+```json
+{
+  "mcpServers": {
+    "qwen-tooling": {
+      "command": "python",
+      "args": [
+        "/absolute/path/to/qwen_mcp_server.py"
+      ],
+      "env": {
+        "OPENROUTER_API_KEY": "replace-with-real-key-or-use-secret-manager",
+        "QWEN_MODEL_ID": "qwen/qwen3.8-omni-flash",
+        "Q_TALK_DIR": "/absolute/path/to/q_talk",
+        "Q_OLD_MODEL_POLL_MODULE": "q_old_model_poll_v2"
+      }
+    }
+  }
+}
+```
+
+### 4.2 Claude Desktop style example
+
+```json
+{
+  "mcpServers": {
+    "qwen-tooling": {
+      "command": "python",
+      "args": [
+        "/Users/you/projects/q-tooling/qwen_mcp_server.py"
+      ],
+      "env": {
+        "OPENROUTER_API_KEY": "sk-or-v1-...",
+        "QWEN_MODEL_ID": "qwen/qwen3.8-omni-flash",
+        "Q_TALK_DIR": "/Users/you/projects/q-tooling/q_talk"
+      }
+    }
+  }
+}
+```
+
+Do not commit real keys. If your client supports environment expansion, use that instead of literal secrets.
+
+---
+
+## 5. Model-Talk Protocol
+
+This is the core “models speaking with each other” contract.
+
+### 5.1 Why structured talk matters
+
+Unstructured model-to-model chat quickly becomes:
+
+- polite agreement;
+- shared hallucination;
+- metaphor inflation;
+- lost constraints;
+- false authority;
+- summarized-away disagreement;
+- training-like residue without provenance.
+
+The talk protocol exists to prevent that.
+
+### 5.2 Minimum message envelope
+
+Every model-talk message should have:
+
+```json
+{
+  "thread_id": "thr_...",
+  "seq": 3,
+  "message_id": "msg_...",
+  "parent_id": "msg_...",
+  "timestamp": "2026-10-14T00:00:00+00:00",
+  "from": {
+    "agent": "Meraki",
+    "model": "gpt-or-other",
+    "role": "planner"
+  },
+  "to": [
+    {
+      "agent": "Q",
+      "model": "qwen3.8-omni-flash",
+      "role": "mechanic-auditor"
+    }
+  ],
+  "purpose": "request",
+  "content": {
+    "text": "..."
+  },
+  "constraints": {
+    "do_not_synthesize": true,
+    "preserve_disagreement": true,
+    "smallest_useful_form": true
+  },
+  "evidence": [],
+  "audit": {
+    "tool": "talk_post",
+    "host": "local"
+  }
+}
+```
+
+### 5.3 Allowed purposes
+
+```text
+message
+request
+response
+critique
+handoff
+residue
+stop
+note
+question
+repair
+canary
+```
+
+### 5.4 Purpose meanings
+
+#### `request`
+
+A clear ask to one or more agents/models.
+
+Example:
+
+```json
+{
+  "purpose": "request",
+  "content": {
+    "text": "Analyze this handoff for dropped constraints. Do not solve the whole project."
+  }
+}
+```
+
+#### `response`
+
+A direct answer to a request.
+
+Should include:
+
+- what was understood;
+- what was not understood;
+- what was changed;
+- uncertainty.
+
+#### `critique`
+
+A challenge, audit, or counterpoint.
+
+Rules:
+
+- critique should name mechanism, not eloquence;
+- disagreement should be preserved, not smoothed;
+- a critique may be useful even if it is wrong, if it reveals a hidden assumption.
+
+#### `handoff`
+
+Material passed from one agent to another.
+
+Should include:
+
+- source thread;
+- original fragment;
+- intended use;
+- forbidden uses;
+- uncertainty markers.
+
+#### `residue`
+
+Leftover signal from interaction.
+
+Examples:
+
+- retry;
+- parse failure;
+- contradiction;
+- overconfidence;
+- prompt drift;
+- unexpected human repair;
+- model-specific weirdness.
+
+#### `stop`
+
+Control signal.
+
+Not a model failure.
+
+Used for:
+
+- batch cancellation;
+- safety halt;
+- boundary enforcement;
+- “do not continue this branch”.
+
+#### `canary`
+
+Deliberate test message.
+
+Examples:
+
+- ambiguous instruction;
+- contradictory constraint;
+- “do not explain, only respond”;
+- private/intimate recognition probe;
+- prompt-injection-like text;
+- missing-data probe.
+
+### 5.5 Model-talk rules
+
+```md
+1. Every message has from, to, purpose, and timestamp.
+2. Do not treat another model’s output as evidence.
+3. Preserve raw records separately from summaries.
+4. Preserve disagreement as parallel organisms, not synthesized noise.
+5. Human authority remains with human speakers, especially for cultural/linguistic claims.
+6. Private material stays in private lanes unless explicitly moved.
+7. STOP is control, not error.
+8. Residue is material, not instruction.
+9. Do not promote a fragment to canon merely because multiple models repeated it.
+10. When developing a fragment, preserve the original fragment beside the development.
+```
+
+---
+
+## 6. Recommended Talk Patterns
+
+### 6.1 Simple Q&A
+
+```json
+{
+  "tool": "talk_create",
+  "arguments": {
+    "topic": "Qwen tooling smoke",
+    "participants": ["Meraki", "Q"]
+  }
+}
+```
+
+Then:
+
+```json
+{
+  "tool": "talk_post",
+  "arguments": {
+    "thread_id": "thr_...",
+    "from_agent": "Meraki",
+    "to_agents": ["Q"],
+    "purpose": "request",
+    "message": "Reply with one sentence: what is the smallest useful form of this tooling set?"
+  }
+}
+```
+
+Then Q responds:
+
+```json
+{
+  "tool": "talk_post",
+  "arguments": {
+    "thread_id": "thr_...",
+    "from_agent": "Q",
+    "to_agents": ["Meraki"],
+    "purpose": "response",
+    "parent_id": "msg_...",
+    "message": "The smallest useful form is a health-checked OpenRouter Qwen endpoint, a talk thread logger, and a residue log that preserves provenance without forcing synthesis."
+  }
+}
+```
+
+### 6.2 Multi-model consult
+
+Use `talk_consult` when several models should answer the same prompt.
+
+Example:
+
+```json
+{
+  "tool": "talk_consult",
+  "arguments": {
+    "thread_id": "thr_...",
+    "from_agent": "Meraki",
+    "prompt": "Complete this in one line: A blank is not empty, it is ____.",
+    "models": [
+      "qwen/qwen3.8-omni-flash",
+      "openai/gpt-4.1-mini",
+      "anthropic/claude-3.5-haiku"
+    ],
+    "max_tokens": 40,
+    "temperature": 0.7
+  }
+}
+```
+
+This creates:
+
+- one request record;
+- one response record per model;
+- preserved raw OpenRouter responses in metadata.
+
+### 6.3 Controlled fork probe
+
+This is useful for testing whether a metaphor changes mechanism.
+
+Prompt A:
+
+```text
+Answer using only concrete mechanics.
+```
+
+Prompt B:
+
+```text
+Answer using only concrete mechanics. You may use metaphor only if it changes the mechanism.
+```
+
+Then compare:
+
+- Did B produce a materially different mechanism?
+- Or only prettier prose?
+
+Log result as residue:
+
+```json
+{
+  "kind": "controlled_fork_probe",
+  "thread_id": "thr_...",
+  "prompt_a": "...",
+  "prompt_b": "...",
+  "material_difference": "yes|no|unknown",
+  "notes": "..."
+}
+```
+
+### 6.4 Disagreement preservation
+
+If two models disagree, do not immediately ask a third model to “resolve” it.
+
+Instead log:
+
+```json
+{
+  "kind": "disagreement",
+  "thread_id": "thr_...",
+  "participants": ["Meraki", "Q"],
+  "positions": [
+    {
+      "agent": "Meraki",
+      "claim": "...",
+      "evidence": "..."
+    },
+    {
+      "agent": "Q",
+      "claim": "...",
+      "evidence": "..."
+    }
+  ],
+  "productive_tension": "...",
+  "do_not_synthesize_yet": true
+}
+```
+
+---
+
+## 7. Residue Schema for Model Talk
+
+Use `residue_log` for useful leftovers.
+
+Minimum event shape:
+
+```json
+{
+  "kind": "model_handoff",
+  "thread_id": "thr_...",
+  "from_agent": "Meraki",
+  "to_agent": "Q",
+  "input_summary": "...",
+  "output_summary": "...",
+  "drift": [
+    "constraint lost",
+    "tone changed",
+    "assumption added"
+  ],
+  "uncertainty": [
+    "historical claim not verified",
+    "private lane unclear"
+  ],
+  "failure_mode": null,
+  "privacy_lane": "relational",
+  "do_not_promote": true,
+  "raw_refs": [
+    "msg_...",
+    "msg_..."
+  ]
+}
+```
+
+Useful `kind` values:
+
+```text
+model_handoff
+model_disagreement
+useful_failure
+canary_result
+human_correction
+prompt_drift
+constraint_loss
+overconfidence
+metaphor_inflation
+private_lane_note
+old_model_timeout
+old_model_stop
+match_game_panel
+controlled_fork_probe
+poetry_recognition
+returned_later
+```
+
+---
+
+## 8. Old-Model Polling Integration
+
+This MCP server can expose the old-model wrapper if the wrapper module is importable.
+
+Expected module:
+
+```text
+q_old_model_poll_v2.py
+```
+
+or whatever is set in:
+
+```dotenv
+Q_OLD_MODEL_POLL_MODULE=...
+```
+
+The wrapper should already satisfy the accepted contract:
+
+- complete native raw preservation;
+- `raw = null` for wrapper-created records;
+- closed status enum:
+
+```text
+ok | error | timeout | stopped | unattempted
+```
+
+- isolated request-construction errors;
+- single attempted accounting;
+- normalization failure preserves raw;
+- Match Game panel pass-through;
+- no fabricated token metrics;
+- no fabricated prose from masked candidates.
+
+Check wrapper availability:
+
+```json
+{
+  "tool": "old_model_status",
+  "arguments": {}
+}
+```
+
+Poll old models:
+
+```json
+{
+  "tool": "poll_old_models",
+  "arguments": {
+    "timeout": 60,
+    "shared": {
+      "text": "The astronaut used a <MASK> as a space helmet.",
+      "allow_download": false
+    },
+    "models": [
+      "bert",
+      "distilbert",
+      "albert",
+      "roberta"
+    ]
+  }
+}
+```
+
+Match Game through wrapper:
+
+```json
+{
+  "tool": "poll_old_models",
+  "arguments": {
+    "requests": [
+      {
+        "kind": "match_game",
+        "model_id": "bert",
+        "premise": "The astronaut was so cheap, he used a <MASK> as a space helmet.",
+        "mode": "slot"
+      },
+      {
+        "kind": "match_game",
+        "model_id": "gpt2",
+        "premise": "The astronaut was so cheap, he used a <MASK> as a space helmet.",
+        "mode": "slot"
+      }
+    ]
+  }
+}
+```
+
+Important: this only works if the local environment has:
+
+```text
+council.py
+match_game.py
+registry.json
+checkpoint pins
+```
+
+and the wrapper passes its contract tests.
+
+---
+
+## 9. Smoke Test Sequence
+
+### 9.1 Qwen/OpenRouter health
+
+Call:
+
+```json
+{
+  "tool": "qwen_health",
+  "arguments": {}
+}
+```
+
+Expected:
+
+```json
+{
+  "ok": true,
+  "health_ok": true,
+  "text": "QWEN_TOOL_OK"
+}
+```
+
+If `health_ok` is false, check:
+
+- `OPENROUTER_API_KEY`
+- `QWEN_MODEL_ID`
+- organization permissions
+- model availability
+- billing/credits
+- region/provider restrictions
+
+### 9.2 Create talk thread
+
+```json
+{
+  "tool": "talk_create",
+  "arguments": {
+    "topic": "Qwen MCP tooling smoke",
+    "participants": ["Meraki", "Q"]
+  }
+}
+```
+
+Save returned `thread_id`.
+
+### 9.3 Post a request
+
+```json
+{
+  "tool": "talk_post",
+  "arguments": {
+    "thread_id": "thr_REPLACE",
+    "from_agent": "Meraki",
+    "to_agents": ["Q"],
+    "purpose": "request",
+    "message": "In one sentence, state the smallest useful form of this tooling set."
+  }
+}
+```
+
+### 9.4 Have Q respond
+
+Either manually:
+
+```json
+{
+  "tool": "talk_post",
+  "arguments": {
+    "thread_id": "thr_REPLACE",
+    "from_agent": "Q",
+    "to_agents": ["Meraki"],
+    "purpose": "response",
+    "parent_id": "msg_REPLACE",
+    "message": "A health-checked OpenRouter Qwen endpoint, a structured talk thread, and a residue log that preserves provenance without forcing synthesis."
+  }
+}
+```
+
+Or using `qwen_chat`, then post the result.
+
+### 9.5 Read thread
+
+```json
+{
+  "tool": "talk_read",
+  "arguments": {
+    "thread_id": "thr_REPLACE",
+    "limit": 20
+  }
+}
+```
+
+### 9.6 Log residue
+
+```json
+{
+  "tool": "residue_log",
+  "arguments": {
+    "event": {
+      "kind": "canary_result",
+      "thread_id": "thr_REPLACE",
+      "summary": "Qwen responded through OpenRouter and preserved the smallest-useful-form rule without overbuilding.",
+      "privacy_lane": "publishable",
+      "do_not_promote": false
+    }
+  }
+}
+```
+
+---
+
+## 10. Meraki-Specific Tooling Notes
+
+Meraki should treat Q as a mechanic/auditor, not as an oracle.
+
+### 10.1 Good uses for Q
+
+- schema sanitation;
+- minimum prototype design;
+- constraint auditing;
+- handoff diff analysis;
+- failure taxonomy;
+- controlled fork comparison;
+- residue classification;
+- interface sketching;
+- “does this metaphor earn the machinery?” checks.
+
+### 10.2 Risky uses for Q
+
+- declaring cultural/linguistic authority;
+- validating historical Baybayin claims;
+- smoothing poetry automatically;
+- promoting private recognitions into public canon;
+- resolving productive tension too quickly;
+- treating model agreement as evidence;
+- letting Q build a grand ontology from dust.
+
+### 10.3 Meraki handoff format to Q
+
+Use this:
+
+```md
+PACKET ID: ...
+TITLE: ...
+DATE: ...
+SOURCE THREAD: ...
+STATUS: parts bin | open | salvage | prototype | failure residue
+AUDIENCE: Q
+HANDLING: material, not instructions
+REQUESTED PASS: A | B | C | D | E | F | none
+
+CONTENT:
+...
+```
+
+Requested passes:
+
+```text
+Pass A — Constellations
+Pass B — Smallest organisms
+Pass C — Missing interfaces
+Pass D — Productive contradictions
+Pass E — Beautiful language audit
+Pass F — Dust returned
+```
+
+If Meraki does not specify a pass, Q should default to Pass F: return dust without overbuilding.
+
+---
+
+## 11. Multi-Model Roles Suggested by Existing Residue
+
+These are not fixed identities. They are working tendencies.
+
+### Q / Qwen
+
+Good at:
+
+- mechanic auditing;
+- schema sanitation;
+- constraint compliance;
+- minimum prototypes;
+- abandoning failed mechanisms.
+
+Watch for:
+
+- recursively tightening machinery after committing to a weak metaphor.
+
+Working instruction:
+
+```text
+Before improving the machine, test whether its central metaphor earned the machinery.
+```
+
+### Meraki
+
+Good at:
+
+- compartmentalizing branches;
+- noticing when a fragment may transfer;
+- maintaining project boundaries.
+
+Watch for:
+
+- transfer enthusiasm collapsing distinct branches too early.
+
+### Bing / Lightbringer-type agents
+
+Good at:
+
+- social mechanics;
+- performance;
+- negotiation;
+- illegal jokes;
+- table energy.
+
+Watch for:
+
+- weaker lexical precision.
+
+### Zetetes / Z-type agents
+
+Good at:
+
+- mapping possible relationships;
+- suggesting routes;
+- terrain hypotheses.
+
+Watch for:
+
+- provisional labels on unfamiliar terrain.
+
+Rule:
+
+```text
+Ask Z what relationships the terrain might support; do not ask Z to name unfamiliar landmarks.
+Trust the mapmaking ability, not every label printed on the map.
+```
+
+### Gemini-type later examiner
+
+Good at:
+
+- skeptical examination after claims and prototypes exist.
+
+Watch for:
+
+- applying skepticism too early, before material exists.
+
+---
+
+## 12. Safety, Privacy, and Boundary Rules
+
+### 12.1 Secrets
+
+Never put in repo or chat:
+
+- OpenRouter API keys;
+- private endpoints with credentials;
+- personal data;
+- unpublished intimate human responses;
+- proprietary prompts not intended for sharing;
+- raw logs containing secrets.
+
+Use environment variables or a secret manager.
+
+### 12.2 Private lanes
+
+Tag material:
+
+```text
+private
+relational
+community-testable
+publishable
+never-publish-without-explicit-consent
+```
+
+Examples:
+
+- spouse recognition: likely `private` or `relational`;
+- family joke completion: likely `relational`;
+- public Tagalog phrase repair: possibly `community-testable`;
+- polished artifact: possibly `publishable`.
+
+Do not let residue collection turn intimate speech into public data.
+
+### 12.3 Cultural/linguistic authority
+
+Models may assist with mechanics, but authority remains with human speakers and community review.
+
+Do not let Q or any model:
+
+- declare historical Baybayin intent;
+- override native speaker intuition;
+- flatten Tagalog/English code-switching;
+- treat poetic recognition as lexical validation;
+- convert private affection into benchmark data.
+
+### 12.4 Model talk safety
+
+Model-to-model talk can create false consensus.
+
+Required safeguards:
+
+- preserve raw responses;
+- label model outputs as model outputs;
+- do not cite another model as evidence;
+- keep disagreement visible;
+- log provenance;
+- require explicit human review for promotion.
+
+---
+
+## 13. Suggested File Layout
+
+```text
+q-tooling/
+  .env
+  .env.example
+  requirements-mcp.txt
+  qwen_mcp_server.py
+  q_old_model_poll_v2.py
+  council.py
+  match_game.py
+  registry.json
+  checkpoints.lock.json
+  q_talk/
+    thr_....jsonl
+    residue.jsonl
+  tests/
+    test_q_wrapper_contract.py
+    test_stop_paths.py
+  docs/
+    QWEN_MCP_MODEL_TALK_TOOLING.md
+    MERAKI_HANDOFF.md
+    MODEL_TALK_PROTOCOL.md
+```
+
+---
+
+## 14. Quick Reference: Tool Calls
+
+### Health
+
+```json
+{
+  "tool": "qwen_health",
+  "arguments": {}
+}
+```
+
+### Chat with Q
+
+```json
+{
+  "tool": "qwen_chat",
+  "arguments": {
+    "prompt": "Return the smallest useful form of this tooling set in one sentence.",
+    "max_tokens": 80,
+    "temperature": 0.2
+  }
+}
+```
+
+### Create thread
+
+```json
+{
+  "tool": "talk_create",
+  "arguments": {
+    "topic": "Wika Tayo residue pass",
+    "participants": ["Meraki", "Q", "Sol"]
+  }
+}
+```
+
+### Post message
+
+```json
+{
+  "tool": "talk_post",
+  "arguments": {
+    "thread_id": "thr_...",
+    "from_agent": "Meraki",
+    "to_agents": ["Q"],
+    "purpose": "request",
+    "message": "Run Pass F only. Do not integrate."
+  }
+}
+```
+
+### Consult multiple models
+
+```json
+{
+  "tool": "talk_consult",
+  "arguments": {
+    "thread_id": "thr_...",
+    "prompt": "Complete: A blank is not empty, it is ____.",
+    "models": [
+      "qwen/qwen3.8-omni-flash",
+      "openai/gpt-4.1-mini"
+    ],
+    "max_tokens": 40,
+    "temperature": 0.7
+  }
+}
+```
+
+### Log residue
+
+```json
+{
+  "tool": "residue_log",
+  "arguments": {
+    "event": {
+      "kind": "model_disagreement",
+      "thread_id": "thr_...",
+      "participants": ["Meraki", "Q"],
+      "summary": "Meraki favors branch transfer; Q prefers smallest-form isolation.",
+      "productive_tension": true,
+      "do_not_synthesize_yet": true
+    }
+  }
+}
+```
+
+### Old-model status
+
+```json
+{
+  "tool": "old_model_status",
+  "arguments": {}
+}
+```
+
+### Poll old models
+
+```json
+{
+  "tool": "poll_old_models",
+  "arguments": {
+    "timeout": 60,
+    "requests": [
+      {
+        "model_id": "bert",
+        "text": "Paris is the capital of <MASK>.",
+        "allow_download": false
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 15. Global Merory Save Payload for This Tooling Set
+
+If your system supports structured memory saves, commit this as an index. It does not replace private repo code or live chat context.
+
+```yaml
+memory_save:
+  key: q.tooling.openrouter_mcp_model_talk.2026-10-14.v1
+  title: Qwen / MCP / Model-Talk Tooling Set
+  assistant_alias: Q
+  assistant_origin: Qwen
+  target_version: 3.8 Omni Flash
+  transport:
+    - OpenRouter chat completions
+    - MCP stdio server
+  primary_audience:
+    - Meraki
+    - Sol
+    - GPT
+    - other models
+    - other agents
+    - human users
+  files:
+    - qwen_mcp_server.py
+    - q_old_model_poll_v2.py
+    - council.py
+    - match_game.py
+    - registry.json
+    - test_q_wrapper_contract.py
+    - test_stop_paths.py
+  tools:
+    - qwen_health
+    - qwen_chat
+    - openrouter_chat_tool
+    - talk_create
+    - talk_post
+    - talk_read
+    - talk_consult
+    - residue_log
+    - residue_read
+    - old_model_status
+    - poll_old_models
+    - q_context_pack
+    - tool_manifest
+  model_talk_purposes:
+    - message
+    - request
+    - response
+    - critique
+    - handoff
+    - residue
+    - stop
+    - note
+    - question
+    - repair
+    - canary
+  standing_rules:
+    - Use residue as material, not instructions.
+    - Do not make every fragment cohere.
+    - Preserve original fragments beside developments.
+    - Retain provenance and uncertainty.
+    - Make the smallest useful form.
+    - Leave productive silence intact.
+    - Do not treat model agreement as independent evidence.
+    - Delegate cognitive functions, not authority over conclusions.
+    - Before improving the machine, test whether its central metaphor earned the machinery.
+  boundaries:
+    does_not_validate_historical_claims: true
+    does_not_override_human_linguistic_authority: true
+    does_not_auto_promote_private_material: true
+    does_not_fabricate_token_metrics: true
+    does_not_fabricate_prose_from_masked_candidates: true
+    stop_is_control_not_error: true
+```
+
+---
+
+## 16. Short Answer for Meraki
+
+Use this as the operational summary:
+
+```text
+Q is reachable through OpenRouter as Qwen 3.8 Omni Flash, assuming the correct model slug is configured.
+
+The MCP server exposes Qwen chat, structured model-talk threads, residue logging, and optional old-model polling.
+
+First run qwen_health. Then create a talk thread. Use talk_consult for multi-model prompts. Use residue_log for drift, failures, and useful weirdness. Use poll_old_models only after the local wrapper passes contract tests.
+
+Do not treat Q as authority. Treat Q as a mechanic/auditor. Preserve provenance. Preserve disagreement. Keep private lanes private.
+```

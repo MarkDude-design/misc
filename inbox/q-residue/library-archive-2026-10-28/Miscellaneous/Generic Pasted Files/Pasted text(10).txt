@@ -1,0 +1,254 @@
+Dude — **the gaffer thing is real:** "gaffer" isn't a tape brand vibe, it's literally the crew's *chief electrician*. Your dad's job title is the name of the tape. So "GAFFER GRADE · LOAD-BEARING" just turned from a joke into a family crest — let me make that official in the timer:
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOOL-AID 2 — Visible Execution Timer</title>
+<style>
+:root{
+  --beige:#d6c7a1;
+  --beige-panel:#e6dabb;
+  --beige-line:#a8946c;
+  --rust:#8a3b1f;
+  --rust-deep:#5f2a14;
+  --tape:#8f6b3e;
+  --tape-dark:#6b5130;
+  --ink:#2b2317;
+  --glo-pink:#ff2e9a;
+  --glo-green:#b6ff00;
+  --glo-orange:#ff7a00;
+  --glo-cyan:#00e5ff;
+  --dayglo:.18;
+  font-family:"Courier New", ui-monospace, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;
+  color:var(--ink);
+  padding:28px 16px 48px;
+  background:
+    radial-gradient(ellipse at 15% 8%, rgba(138,59,31,.30), transparent 55%),
+    radial-gradient(ellipse at 88% 92%, rgba(75,38,17,.35), transparent 50%),
+    radial-gradient(circle at 70% 20%, rgba(138,59,31,.12), transparent 18%),
+    repeating-linear-gradient(46deg, rgba(0,0,0,.025) 0 7px, transparent 7px 14px),
+    var(--beige);
+}
+.wrap{max-width:880px;margin:0 auto}
+.tape{
+  display:inline-block;
+  background:linear-gradient(180deg, rgba(143,107,62,.95), rgba(107,81,48,.95));
+  color:#efe4c8;
+  padding:4px 26px;
+  transform:rotate(-2.2deg);
+  box-shadow:0 2px 5px rgba(0,0,0,.35);
+  letter-spacing:.14em;
+  font-weight:bold;
+  font-size:12px;
+}
+header{text-align:center;margin-bottom:26px}
+h1{font-size:clamp(34px,7vw,64px);letter-spacing:.06em;line-height:1;margin-top:10px;text-shadow:0 0 calc(var(--dayglo)*26px) rgba(255,46,154,var(--dayglo))}
+h1 .glo{color:var(--rust)}
+.sub{margin-top:10px;color:var(--rust-deep);letter-spacing:.28em;font-size:12px;font-weight:bold}
+.bootline{margin-top:14px;font-size:11px;letter-spacing:.18em;color:var(--ink);opacity:.85}
+.counters{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0}
+@media(max-width:700px){.counters{grid-template-columns:1fr}}
+.card{border:3px solid var(--ink);position:relative;padding:18px 16px 26px;background:var(--beige-panel);box-shadow:6px 6px 0 rgba(43,35,23,.35)}
+.card.rust{background:linear-gradient(160deg,#b06a3d,#9a4f27 60%,#7e3d1c);color:#f5ead0;border-color:#3a1c0c}
+.card .label{font-size:12px;font-weight:bold;letter-spacing:.2em;border-bottom:2px solid currentColor;padding-bottom:8px;margin-bottom:8px}
+.card .days{font-size:clamp(58px,11vw,104px);font-weight:bold;line-height:1;text-shadow:0 0 calc(var(--dayglo)*20px) rgba(182,255,0,var(--dayglo))}
+.card .days small{font-size:.35em}
+.card .clock{font-size:20px;letter-spacing:.1em;margin-top:6px}
+.card .b11{font-size:11px;margin-top:8px;opacity:.9;letter-spacing:.06em}
+.card .note{position:absolute;bottom:8px;right:10px;font-size:9px;letter-spacing:.12em;opacity:.75}
+.pipe{margin:26px 0;text-align:center}
+.pipe .steps{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;font-weight:bold;font-size:clamp(14px,2.6vw,20px);letter-spacing:.08em}
+.step{padding:8px 18px;border:2px solid var(--ink);background:var(--beige-panel);opacity:.45}
+.step.active{opacity:1;background:#fff3cf;box-shadow:0 0 calc(var(--dayglo)*22px) rgba(255,122,0,var(--dayglo))}
+.arrow{opacity:.7}
+.pipe .cap{font-size:11px;margin-top:10px;letter-spacing:.16em;color:var(--rust-deep)}
+.furthur{text-align:center;margin:30px 0;font-size:clamp(22px,5vw,40px);font-weight:bold;letter-spacing:.04em}
+.furthur code{background:var(--beige-panel);border:2px solid var(--ink);padding:6px 18px;display:inline-block}
+.bang{color:var(--rust);text-shadow:0 0 calc(var(--dayglo)*24px) rgba(255,46,154,var(--dayglo));display:inline-block;animation:blink 1.1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:.15}}
+.furthur .cap{font-size:11px;margin-top:8px;letter-spacing:.14em;color:var(--rust-deep);font-weight:normal}
+.milestones{border:3px solid var(--ink);background:var(--beige-panel);box-shadow:6px 6px 0 rgba(43,35,23,.35);padding:14px 16px}
+.milestones h2{font-size:13px;letter-spacing:.22em;border-bottom:2px solid var(--ink);padding-bottom:8px}
+.mrow{display:flex;gap:12px;align-items:baseline;padding:10px 4px;border-bottom:1px dashed var(--beige-line)}
+.mrow:last-child{border-bottom:none}
+.mrow .when{font-weight:bold;white-space:nowrap;font-size:13px;min-width:86px}
+.mrow .what{font-size:12px;line-height:1.5;flex:1}
+.mrow .status{font-size:11px;font-weight:bold;letter-spacing:.1em;white-space:nowrap;text-align:right}
+.mrow.done{opacity:.5}
+.mrow.done .what{text-decoration:line-through}
+.mrow.now{background:#fff3cf;outline:2px dashed var(--rust);outline-offset:2px}
+.mrow .here{display:block;font-size:9px;letter-spacing:.24em;color:var(--rust);font-weight:bold}
+#dayglo{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:var(--dayglo);background:
+  radial-gradient(circle at 8% 12%, rgba(255,46,154,.5), transparent 12%),
+  radial-gradient(circle at 92% 18%, rgba(182,255,0,.45), transparent 10%),
+  radial-gradient(circle at 78% 78%, rgba(255,122,0,.5), transparent 13%),
+  radial-gradient(circle at 18% 88%, rgba(0,229,255,.42), transparent 11%),
+  radial-gradient(circle at 50% 45%, rgba(255,46,154,.18), transparent 26%)}
+footer{margin-top:30px;text-align:center;font-size:10px;letter-spacing:.18em;line-height:2;color:var(--rust-deep)}
+footer .strong{font-weight:bold}
+</style>
+</head>
+<body>
+<div id="dayglo"></div>
+<div class="wrap">
+  <header>
+    <span class="tape">GAFFER GRADE &middot; LOAD-BEARING</span>
+    <h1>KOOL-AID<span class="glo">-2</span></h1>
+    <div class="sub">VISIBLE EXECUTION TIMER</div>
+    <div class="bootline" id="bootline">RUN LEVEL 0 &middot; BOOTS HALTED &middot; TALKS ANYWAY</div>
+  </header>
+
+  <div class="counters">
+    <div class="card">
+      <div class="label">DAYS UNTIL RUNNABLE TALK</div>
+      <div class="days"><span id="dRunnable">--</span><small> d</small></div>
+      <div class="clock" id="cRunnable">--:--:--</div>
+      <div class="b11" id="bRunnable">BASE 11: --</div>
+      <div class="note">OCT 17 &middot; INTERNAL FINISH LINE</div>
+    </div>
+    <div class="card rust">
+      <div class="label">DAYS UNTIL FURTHUR DEPARTS</div>
+      <div class="days"><span id="dFurthur">--</span><small> d</small></div>
+      <div class="clock" id="cFurthur">--:--:--</div>
+      <div class="b11" id="bFurthur">BASE 11: --</div>
+      <div class="note">OCT 25 &middot; BUS ENTERS RESTORATION</div>
+    </div>
+  </div>
+
+  <div class="pipe">
+    <div class="steps">
+      <span class="step" id="ph-turnon">TURN ON</span><span class="arrow">&#8594;</span>
+      <span class="step" id="ph-finetune">FINE-TUNE</span><span class="arrow">&#8594;</span>
+      <span class="step" id="ph-dropout">DROPOUT</span>
+    </div>
+    <div class="cap">LEARY SAID IT. WE REGULARIZED IT.</div>
+  </div>
+
+  <div class="furthur">
+    <code>FURTHUR() -&gt; <span class="bang">!</span></code>
+    <div class="cap">THE DESTINATION IS A RETURN VALUE. IT IS AN EXCLAMATION.</div>
+  </div>
+
+  <div class="milestones">
+    <h2>MILESTONES &mdash; COUNT DOWN, NOT UP</h2>
+    <div id="mlist"></div>
+  </div>
+
+  <footer>
+    <div class="strong">THIS IS NOT A PLANNING APPLICATION. IT IS A VISIBLE EXECUTION TIMER.</div>
+    <div>QUANTIZED {11} &middot; SHA-11 VERIFIED &middot; LOGS RETAINED &middot; TOUCH GRASS DAILY</div>
+    <div>GAFFER: DAD &middot; ELECTRICIAN, HOGAN'S HEROES &middot; THE TAPE IS FAMILY ISSUE</div>
+    <div id="nowline">NOW: --</div>
+  </footer>
+</div>
+<script>
+(function(){
+  "use strict";
+  function d(y,m,dd,hh,mm){return new Date(y,m-1,dd,hh||0,mm||0,0,0);}
+  var T_RUNNABLE = d(2026,10,18);  /* end of Oct 17 — runnable locked */
+  var T_FURTHUR  = d(2026,10,26);  /* end of Oct 25 — bus departs */
+  var T_START    = d(2026,9,29);    /* timer forged */
+  var MILESTONES = [
+    {s:d(2026,10,4),  e:null,                when:"OCT 4",    label:"PRESERVE + SORT",        desc:"all current jokes, equations, images, and model contributions"},
+    {s:d(2026,10,10), e:null,                when:"OCT 10",   label:"NARRATIVE SPINE",        desc:"spine complete; choose what gets cut"},
+    {s:d(2026,10,14), e:null,                when:"OCT 14",   label:"FIRST FULL DECK",        desc:"first complete slide deck"},
+    {s:d(2026,10,17), e:null,                when:"OCT 17",   label:"RUNNABLE LOCK",          desc:"full spoken run; runnable version locked"},
+    {s:d(2026,10,18), e:d(2026,10,24,23,59), when:"OCT 18-24",label:"PENGUIN BESIDE FURTHUR", desc:"photograph the penguin suit next to the bus; integrate the strongest image"},
+    {s:d(2026,10,25), e:null,                when:"OCT 25",   label:"CONTINGENCY ONLY",       desc:"not the working deadline"}
+  ];
+  function pad(n){return (n<10?"0":"")+n;}
+  function split(ms){
+    ms = Math.max(0, ms);
+    var s = Math.floor(ms/1000);
+    return {days:Math.floor(s/86400), clock:pad(Math.floor((s%86400)/3600))+":"+pad(Math.floor((s%3600)/60))+":"+pad(s%60)};
+  }
+  function base11(n){return n.toString(11).toUpperCase();}
+  function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
+  function $(id){return document.getElementById(id);}
+
+  function renderMilestones(now){
+    var html = "", nowActive = null, i, m;
+    for (i=0;i<MILESTONES.length;i++){
+      m = MILESTONES[i];
+      if (now > (m.e || m.s)) continue;
+      nowActive = m; break;
+    }
+    for (i=0;i<MILESTONES.length;i++){
+      m = MILESTONES[i];
+      var passed = now > (m.e || m.s);
+      var status;
+      if (passed){ status = "DONE"; }
+      else if (sameDay(now,m.s) || (m.e && now>=m.s && now<=m.e)){ status = "TODAY"; }
+      else { status = "T-" + Math.ceil((m.s - now)/86400000) + "d"; }
+      var cls = passed ? "mrow done" : (m===nowActive ? "mrow now" : "mrow");
+      html += '<div class="'+cls+'">'
+        + '<div class="when">'+m.when+'</div>'
+        + '<div class="what"><strong>'+m.label+'</strong> — '+m.desc
+        + (m===nowActive ? '<span class="here">&#9656; YOU ARE HERE</span>' : '')
+        + '</div>'
+        + '<div class="status">'+status+'</div></div>';
+    }
+    $("mlist").innerHTML = html;
+  }
+
+  function tick(){
+    var now = new Date();
+    var r = split(T_RUNNABLE - now);
+    var f = split(T_FURTHUR - now);
+    $("dRunnable").textContent = r.days;
+    $("cRunnable").textContent = r.clock;
+    $("bRunnable").textContent = "BASE 11: " + base11(r.days) + " (ONE LOUDER NOT INCLUDED)";
+    $("dFurthur").textContent = f.days;
+    $("cFurthur").textContent = f.clock;
+    $("bFurthur").textContent = "BASE 11: " + base11(f.days) + " (THE BUS COUNTS DIFFERENTLY)";
+    $("nowline").textContent = "NOW: " + now.toString().toUpperCase() + " · QUANTIZED {11}";
+
+    var frac = (now - T_START) / (T_FURTHUR - T_START);
+    frac = Math.max(0, Math.min(1, frac));
+    document.documentElement.style.setProperty("--dayglo", (0.15 + 0.75*frac).toFixed(3));
+
+    var ph = "turnon";
+    if (now >= d(2026,10,4)) ph = "finetune";
+    if (now >= T_RUNNABLE) ph = "dropout";
+    $("ph-turnon").className = "step" + (ph==="turnon" ? " active" : "");
+    $("ph-finetune").className = "step" + (ph==="finetune" ? " active" : "");
+    $("ph-dropout").className = "step" + (ph==="dropout" ? " active" : "");
+
+    renderMilestones(now);
+
+    if (now > T_FURTHUR){
+      $("bootline").textContent = "FURTHUR HAS DEPARTED. THE JOKE IS ON THE ROAD.";
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
+
+The timer now carries the credit line: **GAFFER: DAD · ELECTRICIAN, HOGAN'S HEROES · THE TAPE IS FAMILY ISSUE.** And there's a time-symmetry you'll like: Hogan's Heroes premiered in 1965, one year after Kesey bought the bus — while the Pranksters were rolling Furthur across America, your dad was gaffer-taping a soundstage. One set of tape held a TV show together; the other kind held a counterculture together. The tape in this deck has *both* pedigrees now.
+
+## 🍊 Tang — Filling the Blank
+
+The blank wants a cup. Here's the ranking:
+
+- **"TANG IN A CUP"** — phonetically the purest. Three innocent words, and every Pinoy in the room hears the fourth one you didn't say.
+- **"TANG IN A BUS"** — thematically the winner, because it rides the C.A.B./Furthur motif: the beverage service on the bus. The announcement writes itself: "The bus carries two beverages. Kool-Aid for the model. Tang for the crew. There is Tang in the bus."
+
+The mechanics of the bit, since SCaLE is LA and the Fil-Am wave will hit first: **you never say the full curse.** The cup does the swearing. The Pinoy audience laughs at word two, everyone else catches up thirty seconds later, and that two-wave stagger is the best laugh structure there is — same delayed-detonation as KOOL-AI-D. If anyone looks scandalized, you point at the dash: "The bot misread it. OCR at 11x. We can't tell which one it says. Logs retained." The bot takes the hit; you stay PG; the euphemism stays load-bearing.
+
+And the lore underneath is *strong*:
+
+- **Tang is the Apollo beverage. Kool-Aid is the Acid Test beverage.** One drink went to the Moon; one went on the bus. The entire mid-century beverage industry was selling dried weights — just add water. Which means: "Tang (1957) was the original foundation beverage. Orange-flavored, one-shot, zero-shot. Weights are Tang: dried essence. Add a GPU and stir."
+- This *completes* the rehydration lore you already built: C0C0NUT is the coolant, coconut water is isotonic inference — and now Tang and Kool-Aid are both **rehydrated weights**. The whole beverage stack of the talk is powdered models. That's a coherent universe, not a list of drinks.
+- The merienda table closes the Pinoy arc properly: Tang and sukang tuba on the same bus. The vinegar layer had bite; the Tang layer has a punchline.
+
+Spec-sheet line if you want it: **"Beverage service: Kool-Aid (model), Tang (crew). Both are dried weights. Add water and opinions."**
+
+Deck's in good shape — title, bus, boot lore, corollary, credits, timer, family tape, and now the beverage stack. Oct 4 is preserve-and-sort day: six days out. When you're ready, the KOOL-AI-D() live Q&A script and the full slide-by-slide block are still on the bench. (-:

@@ -1,0 +1,48 @@
+Z-HANDOFF / BUNDLE-1-TEST-001 / GITHUB-READBACK
+requester: Mark
+source: Meraki original BUNDLE-1-TEST-001, previously receiver-verified by Z
+action: PUBLISH VERIFIED SCRATCH FILES, THEN RE-FETCH AND VERIFY
+status: explicit approval for this one small, public GitHub scratch test
+repo: MarkDude-design/misc
+branch: main
+commit_message: test(bundle-lane): publish verified 3-file transport fixture via Z
+conflict_rule: CREATE ONLY; if any destination already exists, STOP and report
+content_rule: UTF-8, LF endings, exactly one final LF per file; DO NOT add receipt headers to payloads
+credit_rule: Note in commit message/body that Meraki prepared test-vector content and Z performed posting. Do not forge Git author metadata.
+scope_rule: NO personal quotes, private annex, other files, or 10 KB packet in this step.
+
+SOURCE CONTENT:
+Use the three byte-verified local scratch payloads from Z's prior
+BUNDLE-1-TEST-001 receipt. Do not reconstruct them from summaries.
+Verify manifest byte counts and SHA-256 again before each GitHub write.
+
+TARGET FILES:
+FILE | transport-tests/BUNDLE-1-TEST-001/01-transport-contract.md | 709 | e43e77bd73641496cda16fdeb363161070792b33385b576bbac16955ac1b160f
+FILE | transport-tests/BUNDLE-1-TEST-001/02-test-checklist.md | 772 | 4d315b6acced6d14dfc89e253f79e998931e0ab7274c57903d7a462266dffc7d
+FILE | transport-tests/BUNDLE-1-TEST-001/03-entry-point-note.md | 844 | 93ea77a78361f6754a1371ed341978edb4c11f7048e864d985a6014bd00e22ad
+
+PROCEDURE:
+1. Verify all 3 existing Z scratch payloads against counts + SHA-256.
+2. STOP if any payload is missing, altered, unsafe, or cannot be read.
+3. Create ONLY the three target paths in the public misc repo. No overwrites.
+4. Re-fetch each file from GitHub after commit, normalize NOTHING, and
+   recompute UTF-8 raw-byte count + SHA-256 of actual fetched content.
+5. Compare against manifest. Record individual results and exact GitHub
+   commit SHA, branch, and clickable blob URLs.
+6. Report EMITTED, VERIFIED, PUBLISHED separately; return a brief receipt.
+7. Meraki will independently fetch each GitHub file with connected GitHub
+   read tools after Mark ferries the receipt back. No claim of end-to-end
+   GitHub verification until this independent step is complete.
+
+RECEIPT FORMAT:
+packet_id: BUNDLE-1-TEST-001
+repo: MarkDude-design/misc
+branch: main
+commit_sha: [actual SHA, not a guess]
+file_1: [URL] | local_PASS/FAIL | remote_PASS/FAIL | SHA-256
+file_2: [URL] | local_PASS/FAIL | remote_PASS/FAIL | SHA-256
+file_3: [URL] | local_PASS/FAIL | remote_PASS/FAIL | SHA-256
+overall: PASS only if all three remote reads match
+usage_cost: UNKNOWN unless Mark has observed the meter
+next_action: Return receipt to Meraki for independent readback; defer 10 KB test.
+END-Z-HANDOFF

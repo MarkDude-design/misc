@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1789765260876-a4yqfmrtu",
+    "timestamp": "2026-09-18T21:01:00.876Z",
+    "method": "POST",
+    "url": "http://localhost:8787/mcp",
+    "requestHeaders": {
+      "accept": "application/json, text/event-stream",
+      "content-type": "application/json"
+    },
+    "requestBody": "{\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"sampling\":{},\"elicitation\":{\"form\":{},\"url\":{}},\"roots\":{\"listChanged\":true},\"tasks\":{\"list\":{},\"cancel\":{},\"requests\":{\"sampling\":{\"createMessage\":{}},\"elicitation\":{\"create\":{}}}},\"extensions\":{\"io.modelcontextprotocol/tasks\":{},\"io.modelcontextprotocol/ui\":{\"mimeTypes\":[\"text/html;profile=mcp-app\"],\"elicitation\":{}},\"io.modelcontextprotocol/skills\":{}}},\"clientInfo\":{\"name\":\"mcp-inspector\",\"version\":\"0.0.0\"}},\"jsonrpc\":\"2.0\",\"id\":0}",
+    "error": "fetch failed",
+    "duration": 4,
+    "category": "transport"
+  }
+]

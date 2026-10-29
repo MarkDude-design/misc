@@ -1,0 +1,76 @@
+Z wrapper: local integration decision
+2026-10-09, America/Los_Angeles
+
+Accepted after corrections. Integrated into the local package as
+council_batch.py, usable through Python import or its stdin/stdout CLI.
+No GitHub merge, publication, relay modification, or frontier connection.
+The submitted Z source remains available in its earlier file version.
+
+Why this implementation
+It is a small adapter around the existing three entry points and already has
+the agreed status vocabulary, deep-copied native records, symbolic support and
+unattempted accounting. Q's implementation remains a separate reviewed draft.
+
+Issues reproduced in Z's original
+- requested_input was null for its documented flat call objects.
+- run_id and revision/provenance were only inside raw.
+- A malformed middle call (null) aborted the batch with AttributeError.
+- A panel batch could advertise timeout=7 although the native panel uses 120;
+  no per-call effective timeout was present.
+- Unknown call kinds silently fell through to invoke.
+- A non-dictionary native return could crash normalization.
+- Every caught exception was called wrapper_preflight, even though the wrapper
+  could not establish where the exception originated.
+
+Corrections integrated
+- Preserve the full original call, native dispatch arguments, framed input,
+  panel data, and native record separately. Expose run_id, revision, lineage,
+  family year, authenticity and provenance where available; otherwise null.
+- Capture started_at and consistent request_id; generate missing call IDs.
+- Report timeout per row: invoke default/override, panel 120, symbolic null.
+- Isolate malformed calls and reject unknown kinds. Retain unexpected native
+  return values under raw and report structured normalization errors.
+- Label caught exceptions wrapper_boundary. Preserve actual native stages.
+- Observe STOP at boundaries without fabricating a native response. Wrapper
+  events and unattempted rows have raw=null; unknown native phase remains null.
+- Expose attempted as native-entry-point dispatch, not inference completion.
+- Keep native symbolic output untouched in raw, with a typed symbolic_text
+  payload for consumers. It remains explicitly a new symbolic program.
+- CLI returns exit 1 for error/timeout and can append the finished envelope.
+
+Validation: 12/12 tests passed in 1.355 seconds
+Command from legacy-council:
+python -m unittest discover -s tests -p test_batch_wrapper.py -v
+Evidence: evidence/batch-wrapper-tests.txt
+
+Covered: raw deep-copy preservation and unknown fields; requested input;
+provenance and null metrics; malformed middle calls; unknown kinds; real panel
+preflight rejection; effective per-kind timeouts; panel metadata; native error
+stages; malformed native returns; STOP before dispatch; STOP between calls;
+symbolic STOP without model identity; real supervisor timeout followed by a
+successful fixture call; real mid-call child termination followed by an
+unattempted tail; CLI output/JSONL/error exit.
+
+Slow/success/crash subprocesses are explicitly labeled fixtures. Symbolic
+operations and validation use actual project code. No pretrained checkpoint
+was run for this merge, and no new historical-model contribution is counted.
+The earlier 10 native STOP regression tests also passed during the initial
+combined discovery run; the final report isolates the 12 new wrapper tests.
+
+Remaining integration boundary
+The existing four MCP tools are untouched. Register a batch tool and test its
+protocol round trip before claiming MCP batch support. No MCP dependencies
+or model weights were installed for this review. The ALBERT-to-decoder chain
+remains an independent, unproven optional experiment.
+
+Current interface/limits
+batch accepts a JSON list of flat invoke/panel/symbolic call objects, not Q's
+requests/shared/models convenience envelope. Native STOP handles mid-call
+interruption. The finished-envelope JSONL output is not an incremental durable
+journal. Python exceptions for malformed top-level JSON/list shape are batch
+input errors. Output raw fidelity is JSON-data fidelity, not original bytes.
+
+For Q and Z
+Use this corrected small wrapper as the integration base. Q can review the
+field names and run the included tests. Any additional convenience interface
+should be a thin input adapter that preserves per-item isolation and evidence.

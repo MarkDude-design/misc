@@ -1,0 +1,261 @@
+Below are the complete non-test sections of the saved patch, unchanged. The documentation still reflects the earlier spec questions; your resolutions supersede those passages. No files were modified, and live acceptance was not run.
+
+Chunk 1 of 3 — `castle/TALK.md`
+
+````diff
+diff --git a/castle/TALK.md b/castle/TALK.md
+index c8129da..d0b9a3e 100644
+--- a/castle/TALK.md
++++ b/castle/TALK.md
+@@ -38,29 +38,52 @@ Tool mode is deliberately opt-in and OpenRouter-only. It exposes one local,
+ read-only function: `read_room`. The model receives an enum of the JSON files
+ under `castle/rooms/`; it cannot supply a filesystem path, URL, Python, shell,
+ or write operation. The first tool-enabled request requires `read_room`, then
+-the client executes it locally and sends the structured result back to the same
+-named model for a final answer.
++the client executes it locally and requests the final answer using the same
++named model ID. Requested and returned IDs are recorded separately; provider
++identity is reported metadata, not a checkpoint attestation.
+ 
+ Run one acceptance transaction from the repository root:
+ 
+ ```sh
+-python castle/talk.py --room-tools --rounds 1 --openrouter-model nvidia/nemotron-3.5-lightning:free --prompt "Use read_room to inspect the courtyard. Tell me its name and one detail that is actually stored there."
++python castle/talk.py --room-tools --rounds 1 --openrouter-model nvidia/nemotron-3.5-lightning:free --prompt "First give one short sentence introducing your inspection, then call read_room for courtyard. After the tool result, tell me the room's name and one detail actually stored there."
+ ```
+ 
+ On Windows, substitute `py -3` for `python` if needed. Press Enter at the Groq
+ key prompt to skip it, then enter the OpenRouter key using the hidden prompt.
++For an OpenRouter-only receipt, GROQ_API_KEY must be unset in this terminal;
++otherwise its configured provider seat also runs. Never supply a key as a
++command-line argument. Run the reviewed code, not an older checkout.
+ The example model appeared in OpenRouter's public model catalog with `tools`
+-support on 2026-10-13. Free availability changes; if it disappears, choose a
++support on 2026-10-13; this review could not recheck the live catalog because
++network access returned HTTP 403. Free availability changes; if it disappears, choose a
+ named `:free` model from:
+ https://openrouter.ai/models?supported_parameters=tools
+ 
+ `openrouter/free` is rejected in room-tool mode. Its underlying model may
+ change between the tool request and continuation, which would make the receipt
+-ambiguous. A successful JSONL receipt contains two separately counted API
++ambiguous. The smallest successful JSONL receipt contains two separately counted API
+ calls, a `tool_executed` event with the actual room envelope and tool-call ID,
+ the returned model and inference IDs when supplied, and the final answer.
+ Every continuation repeats the tool schema, and the whole process retains the
+ existing 12-call cap plus a separate four-tool-execution cap.
++Repeated reads with new IDs can use more than two calls, within those caps.
++Duplicate or reused tool-call IDs stop the transaction before re-execution.
++Malformed tool-call shapes are errors even if they accompany text. Invalid
++arguments or unregistered names yield structured tool errors, not room data.
++STOP is checked before each local tool execution and before API calls; it
++cannot interrupt a local read already underway or cancel a remote request.
++
++Exit zero alone is not a live acceptance receipt. Inspect the JSONL for the
++model-requested `read_room` call, matching `tool_call_id`, a successful local
++envelope equal to the stored courtyard JSON, and a subsequent answer that
++names the room and cites a real detail. Confirm the requested model ID stays
++fixed and the returned IDs agree across the transaction. Missing model IDs
++leave identity unverified. Record inference IDs and usage when supplied,
++otherwise mark them unreported. Include every error or stop event; tool errors
++are recorded on `tool_executed`, while session `counts.error` also includes
++API and orchestration failures. Verify both an actual pre-tool sentence and
++the grounded follow-up if claiming PR #3's full smallest-success receipt;
++a null-content tool call alone supplies no pre-tool answer.
+ 
+ Defaults: Groq `openai/gpt-oss-20b`, OpenRouter `openrouter/free`, two rounds,
+ up to 1,024 completion tokens per call, no retries, at most 12 calls per process.
+````
+
+Chunk 2 of 3 — `castle/room_tools.py`
+
+```diff
+diff --git a/castle/room_tools.py b/castle/room_tools.py
+index db43321..247ef6a 100644
+--- a/castle/room_tools.py
++++ b/castle/room_tools.py
+@@ -9,6 +9,15 @@ ROOMS_DIR = Path(__file__).resolve().parent / 'rooms'
+ ROOM_ID = re.compile(r'^[a-z0-9_]+$')
+ 
+ 
++def unique_fields(pairs):
++    arguments = {}
++    for name, value in pairs:
++        if name in arguments:
++            raise ValueError('Duplicate tool argument field')
++        arguments[name] = value
++    return arguments
++
++
+ def room_paths(rooms_dir=ROOMS_DIR):
+     """Return the enumerated room registry as ``room_id -> JSON path``."""
+     base = Path(rooms_dir).resolve()
+@@ -99,8 +108,8 @@ def execute_tool_call(tool_call, rooms_dir=ROOMS_DIR):
+                             'message': 'Tool arguments must be a JSON object string.'}}
+     else:
+         try:
+-            arguments = json.loads(requested_arguments)
+-        except json.JSONDecodeError:
++            arguments = json.loads(requested_arguments, object_pairs_hook=unique_fields)
++        except (ValueError, RecursionError):
+             result = {'ok': False, 'data': None,
+                       'error': {'code': 'invalid_json',
+                                 'message': 'Tool arguments are not valid JSON.'}}
+```
+
+Chunk 3 of 3 — `castle/talk.py`
+
+```diff
+diff --git a/castle/talk.py b/castle/talk.py
+index 379cbbe..4a40150 100644
+--- a/castle/talk.py
++++ b/castle/talk.py
+@@ -105,7 +105,11 @@ def complete(provider, key, body):
+         record['raw'] = native
+         if not isinstance(native, dict):
+             raise ValueError('Provider returned a non-object response')
+-        record['returned_model'] = native.get('model')
++        returned_model = native.get('model')
++        if returned_model is not None and (not isinstance(returned_model, str)
++                                           or not returned_model.strip()):
++            raise ValueError('Provider returned malformed model identity')
++        record['returned_model'] = returned_model
+         record['usage'] = native.get('usage')
+         if native.get('error'):
+             raise ValueError('Provider returned an error; see raw.error')
+@@ -116,8 +120,16 @@ def complete(provider, key, body):
+             raise ValueError('Provider returned no assistant message')
+         text = message.get('content')
+         tool_calls = message.get('tool_calls')
++        if tool_calls is not None and not isinstance(tool_calls, list):
++            raise ValueError('Provider returned malformed tool_calls; expected a list')
++        if message.get('role', 'assistant') != 'assistant':
++            raise ValueError('Provider returned a non-assistant message')
+         has_text = isinstance(text, str) and bool(text.strip())
+         has_tools = isinstance(tool_calls, list) and bool(tool_calls)
++        if has_tools and message.get('role') != 'assistant':
++            raise ValueError('Tool-call message requires role: assistant for continuation')
++        if has_tools and text is not None and not isinstance(text, str):
++            raise ValueError('Tool-call message content must be text or null')
+         if not has_text and not has_tools:
+             raise ValueError('No text or tool call returned; native response preserved')
+         record.update(status='ok', text=text if has_text else None,
+@@ -176,13 +188,15 @@ def run(args, keys):
+     providers = [p for p in PROVIDERS if keys.get(p)]
+     room_tool_mode = bool(getattr(args, 'room_tools', False))
+     catalog = room_tools.tool_catalog() if room_tool_mode else None
+-    print(f'\n{session_id}\nTranscript: {path}\nHost: {args.prompt}\n', flush=True)
++    clean_prompt, _ = redact(args.prompt, keys.values())
++    print(f'\n{session_id}\nTranscript: {path}\nHost: {clean_prompt}\n', flush=True)
+     print(f'Ctrl+C stops. STOP file is checked between calls. Maximum {MAX_CALLS} calls.\n',
+           flush=True)
+     counts = {'ok': 0, 'error': 0, 'stopped': 0}
+     replies = 0
+     call_index = 0
+     tool_executions = 0
++    seen_tool_call_ids = set()
+     last_openrouter = None
+     stop = False
+     with path.open('x', encoding='utf-8') as log:
+@@ -199,21 +213,24 @@ def run(args, keys):
+                'max_tool_executions': MAX_TOOL_EXECUTIONS if room_tool_mode else 0,
+                'source_kind': 'live_api', 'historical_model': False})
+ 
+-        def call_provider(provider, body, phase='reply'):
+-            nonlocal call_index, last_openrouter, stop
+-            if call_index >= MAX_CALLS:
+-                return None
++        def stopped():
++            nonlocal stop
++            if stop:
++                return True
+             if args.stop_file.exists():
+                 stop = True
+                 write({'event': 'session_stopped', 'session_id': session_id,
+                        'reason': 'STOP file present', 'at': now()})
++                return True
++            return False
++
++        def call_provider(provider, body, phase='reply'):
++            nonlocal call_index, last_openrouter, stop
++            if stopped() or call_index >= MAX_CALLS:
+                 return None
+             if provider == 'openrouter' and last_openrouter is not None:
+                 time.sleep(max(0, 4 - (time.monotonic() - last_openrouter)))
+-            if args.stop_file.exists():
+-                stop = True
+-                write({'event': 'session_stopped', 'session_id': session_id,
+-                       'reason': 'STOP file present', 'at': now()})
++            if stopped():
+                 return None
+             call_index += 1
+             if provider == 'openrouter':
+@@ -228,6 +245,8 @@ def run(args, keys):
+                             'source_kind': 'live_api', 'historical_model': False,
+                             'request': body, **result})
+             counts[result['status']] += 1
++            if result['status'] == 'stopped':
++                stop = True
+             return result
+ 
+         try:
+@@ -252,6 +271,9 @@ def run(args, keys):
+                         native_messages = []
+                         tool_failed = False
+                         while result['status'] == 'ok' and result.get('tool_calls'):
++                            if stopped():
++                                tool_failed = True
++                                break
+                             if not tool_enabled:
+                                 counts['error'] += 1
+                                 tool_failed = True
+@@ -259,6 +281,18 @@ def run(args, keys):
+                                        'at': now(), 'reason': 'Tools were not enabled'})
+                                 break
+                             calls = result['tool_calls']
++                            call_ids = [call.get('id') if isinstance(call, dict) else None
++                                        for call in calls]
++                            if (any(not isinstance(call_id, str) or not call_id.strip()
++                                    for call_id in call_ids)
++                                    or len(set(call_ids)) != len(call_ids)
++                                    or seen_tool_call_ids.intersection(call_ids)):
++                                counts['error'] += 1
++                                tool_failed = True
++                                write({'event': 'tool_loop_stopped', 'session_id': session_id,
++                                       'at': now(), 'call_index': call_index,
++                                       'reason': 'Invalid or repeated tool-call ID'})
++                                break
+                             if tool_executions + len(calls) > MAX_TOOL_EXECUTIONS:
+                                 counts['error'] += 1
+                                 tool_failed = True
+@@ -276,11 +310,19 @@ def run(args, keys):
+                             messages.append(assistant_message)
+                             native_messages.append(assistant_message)
+                             for tool_call in calls:
++                                if stopped():
++                                    tool_failed = True
++                                    break
+                                 execution = room_tools.execute_tool_call(tool_call)
+                                 tool_executions += 1
++                                seen_tool_call_ids.add(execution['tool_call_id'])
+                                 write({'event': 'tool_executed', 'session_id': session_id,
+                                        'at': now(), 'provider': provider,
+-                                       'requested_model': models[provider], **execution})
++                                       'requested_model': models[provider],
++                                       'returned_model': result.get('returned_model'),
++                                       'inference_id': result.get('inference_id'),
++                                       'call_index': call_index,
++                                       'source_kind': 'local_tool', **execution})
+                                 if not execution['tool_call_id']:
+                                     counts['error'] += 1
+                                     tool_failed = True
+@@ -309,6 +351,8 @@ def run(args, keys):
+                                 break
+                             if result.get('returned_model'):
+                                 transaction_models.add(result['returned_model'])
++                            if len(transaction_models) > 1:
++                                break
+                         if tool_enabled and len(transaction_models) > 1:
+                             counts['error'] += 1
+                             tool_failed = True
+```

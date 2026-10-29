@@ -1,0 +1,423 @@
+MECHANIC — TRIAL EXPEDITION, ROUND 1
+
+CHALLENGE TO THE ASSIGNMENT
+The brief asks for playable inference from incomplete language-like pieces while forbidding semantic completion, translation, or cultural authority. Therefore the safest mechanical output is not a finished ruleset. It is a set of provisional mechanics, evidence boundaries, and a minimal physical probe.
+
+EPISTEMIC BOUNDARY
+No fluent-model completion is treated as evidence. No reconstructed word is treated as correct. No inferred rule is treated as authoritative. All proposed mechanics are testable hypotheses only.
+
+SUPPLIED FACT
+1. The prompt lists these printed pieces:
+
+Multiword pieces:
+BAYANI PUSO
+BUNGA BUBO
+SARILI ISI
+SARILI LOO
+SARILI TANGLA
+MATUWID NA ISI
+MALINI NA LOO
+MALAYA PAG-IISI
+MARANGA NA LOO
+NASA MATUTO
+HABI DIWA
+BAGO SALI
+BAHALA NA
+
+Short pieces:
+A
+NA
+SA
+NI
+
+Single-word pieces:
+KIKILO
+TITIGA
+BURA
+UTO
+TAE
+IHI
+BETLO
+BASTOS
+BASTOS
+
+Blanks:
+[BLANK]
+[BLANK]
+
+2. If each line and each blank is one piece, the list contains 28 items.
+3. Some printed forms deliberately omit expected word-final consonant sounds.
+4. Players have shown that, after receiving one small cue, they can sometimes recognize and mentally restore those omitted sounds.
+5. No complete rules, win condition, turn order, player count, or component material are supplied.
+6. The visible text contains repetitions:
+   - SARILI appears on three multiword pieces.
+   - LOO appears on three multiword pieces.
+   - ISI appears on at least two multiword pieces.
+   - NA appears inside several multiword pieces and also as a separate short piece.
+   - BASTOS appears twice.
+7. Two [BLANK] pieces are supplied.
+
+UNKNOWN
+1. The objective of the prototype.
+2. Whether pieces are cards, tiles, slips, tiles with backs, board spaces, or something else.
+3. Whether orientation, reversal, stacking, overlap, covering, distance, or silence are intended mechanics.
+4. Which pieces are affected by final-consonant omission.
+5. What the “small cue” is.
+6. Whether A, NA, SA, NI are grammatical connectors, scoring marks, wildcards, separators, or something else.
+7. Whether BASTOS being duplicated is intentional, a hazard, a decoy, a mistake, or a match target.
+8. Whether the blanks are meant to be written on, placed under pieces, used as substitutes, or left empty.
+9. Any cultural, linguistic, spiritual, historical, or authoritative meaning.
+10. Whether unfamiliar fragments such as KIKILO, TITIGA, and BETLO correspond to words, sounds, game terms, or placeholders.
+
+MECHANICAL INFERENCE
+1. Repeated visible strings make exact-string matching plausible.
+   - Example: SARILI / SARILI / SARILI, LOO / LOO / LOO, ISI / ISI.
+2. Multiword pieces have potential left and right edges, so orientation could matter.
+3. The short pieces A, NA, SA, NI could function as bridges, separators, modifiers, or wildcards because they are small and can be inserted between larger pieces.
+4. The supplied omission fact makes hidden-information or restoration mechanics plausible.
+5. The blanks can physically perform restoration, substitution, annotation, uncertainty marking, or silence.
+6. The duplicate BASTOS piece can support matching, stacking, decoy status, hazard status, or redundancy.
+7. Because the pieces look language-like, players may import linguistic, poetic, or cultural expectations. That is a behavioral risk, not a rule.
+
+LEXICAL HYPOTHESIS — HUMAN REVIEW REQUIRED
+1. Several strings are orthographically plausible as possible Tagalog or related Philippine-language lexical items. This is only form recognition. No meaning is assigned and no completion is performed.
+
+Possible lexical-form hypotheses, unvalidated:
+BAYANI
+PUSO
+BUNGA
+BUBO
+SARILI
+ISI
+LOO
+TANGLA
+MATUWID
+MALINI
+MALAYA
+PAG-IISI
+MARANGA
+NASA
+MATUTO
+HABI
+DIWA
+BAGO
+SALI
+BAHALA NA
+A
+NA
+SA
+NI
+BURA
+UTO
+TAE
+IHI
+BASTOS
+
+2. KIKILO, TITIGA, and BETLO are UNKNOWN to me. No lexical inference is made for them.
+3. Any restoration of omitted final consonants is UNKNOWN and requires human review.
+4. Any identification of A, NA, SA, NI as grammatical particles is only a LEXICAL HYPOTHESIS — HUMAN REVIEW REQUIRED.
+
+PLAUSIBLE PLAY FORMS
+All entries below are DESIGN PROPOSAL unless otherwise marked.
+
+1. Restoration draft
+Players place a [BLANK] beside or under a piece they suspect is incomplete. They may write a proposed mark on the blank.
+Physical operations: adjacency, writing, covering, distance.
+Evidence anchor: supplied omission fact + supplied blanks.
+Status: MECHANICAL INFERENCE that blanks can carry restoration proposals; DESIGN PROPOSAL for the actual rule.
+
+2. Visible-edge chain
+Players arrange pieces so touching edges share an exact visible string, such as SARILI, LOO, ISI, or NA.
+Physical operations: adjacency, orientation, reversal, distance.
+Evidence anchor: repeated visible strings.
+Status: MECHANICAL INFERENCE for matching possibility; DESIGN PROPOSAL for the rule.
+
+3. Connector bridge
+Players use short pieces A, NA, SA, NI between larger pieces to make or break connections.
+Physical operations: adjacency, distance, orientation.
+Evidence anchor: presence of short pieces and repeated NA inside longer pieces.
+Status: DESIGN PROPOSAL.
+
+4. Substring harvest
+Players collect or stack pieces that share a visible substring, such as SARILI, LOO, ISI, or BASTOS.
+Physical operations: stacking, grouping, overlap.
+Evidence anchor: repeated strings and duplicate BASTOS.
+Status: DESIGN PROPOSAL.
+
+5. Silent response probe
+One piece is placed as a prompt. Other players register acceptance, uncertainty, refusal, or correction by distance, covering, blank placement, or silence.
+Physical operations: distance, covering, silence, writing on blanks.
+Evidence anchor: evocative phrase pieces, blanks, and the supplied fact that omission can be recognized after a cue.
+Status: DESIGN PROPOSAL.
+
+6. Hidden-consonant bluff
+One player secretly marks a blank with a proposed restoration. Other players guess whether the blank is a serious restoration, a wildcard, or a decoy.
+Physical operations: covering, stacking, adjacency, reveal.
+Evidence anchor: omission fact, blanks, duplicate BASTOS as possible decoy.
+Status: DESIGN PROPOSAL.
+
+PHYSICAL FUNCTION MAP
+Operation | Possible mechanical job | Claim status
+Adjacency | Connection, match, proposal | DESIGN PROPOSAL
+Distance | Uncertainty, pause, rejection, strength of link | DESIGN PROPOSAL
+Orientation | Active/inactive, direction, edge selection | DESIGN PROPOSAL
+Reversal | Undo, negation, alternate reading, invalid placement | DESIGN PROPOSAL
+Stacking | Alternative possibilities, emphasis, captured pieces, duplicate resolution | DESIGN PROPOSAL
+Overlap | Shared fragment, merge, compression | DESIGN PROPOSAL
+Covering | Silence, suppression, hidden state, taboo/hazard | DESIGN PROPOSAL
+Silence | Missing sound, no negotiation, ritual restraint, test constraint | DESIGN PROPOSAL, partly supported by supplied omission fact
+Writing on blanks | Restoration proposal, wildcard, note, uncertainty marker | MECHANICAL INFERENCE from blanks + omission fact
+
+ADDITIONAL ORDINARY PIECES DECISION
+Decision: Yes, additional ordinary items are necessary for the five-minute physical test, but only as test equipment, not as game content.
+
+Necessary ordinary item 1: one pencil or erasable marker.
+Job: allow a player to mark [BLANK] pieces without permanently destroying supplied pieces.
+Mechanical reason: without a writing tool, the blank-writing function cannot be tested.
+
+Necessary ordinary item 2: one cue slip.
+Job: deliver the one small cue and the basic task without a spoken lecture.
+Candidate non-Tagalog wording, unvalidated as game text:
+“Some pieces may be missing an ending. Make any silent arrangement. There is no correct answer. Use blanks only if needed.”
+Back of slip:
+“Point to the part you are least sure about.”
+
+Optional ordinary item: observer timer.
+Job: enforce five-minute limit.
+Status: not a game component.
+
+No Tagalog wording is proposed. If language bias is a concern, the cue slip can be replaced by a nonverbal gap-symbol card showing a visible empty final slot and an arrow toward a blank. The practical job is the same: cue possible omission without lecturing.
+
+FAILURE MODES
+Most items below are MECHANICAL INFERENCE.
+
+1. Objective misunderstanding.
+The player may ask, “What am I supposed to make?” because the pieces feel like meaningful language but no goal is given.
+
+2. Profound-answer pressure.
+The player may feel forced to produce a correct sentence, poem, moral statement, or culturally meaningful arrangement.
+
+3. Translation freeze.
+The player may stop manipulating pieces and request or seek translation.
+
+4. Completion compulsion.
+The player may silently restore omitted sounds and treat the restoration as fact.
+
+5. Blank paralysis.
+The player may refuse to write on [BLANK] pieces for fear of defacing components or being wrong.
+
+6. Cue overfit.
+After hearing “missing ending,” the player may assume every piece is incomplete.
+
+7. Expertise asymmetry.
+A player who knows Tagalog or another related language may feel pressured to become an authority, or may be treated as one by others.
+
+8. Duplicate confusion.
+The two BASTOS pieces may be read as a mistake, a joke, an offense, or a hidden clue.
+
+9. Model contamination.
+Players may ask a machine for completions, which would test model fluency rather than human physical play.
+
+10. Observer bias.
+The observer may interpret arbitrary arrangement as grammar, spirituality, or narrative when the evidence is only placement.
+
+MINIMUM FIVE-MINUTE PROTOTYPE
+Purpose: observe what a human naturally does with a small subset of language-like pieces after one small omission cue.
+
+Players:
+1 builder + 1 observer.
+
+Components required:
+Six supplied phrase pieces:
+SARILI ISI
+SARILI LOO
+SARILI TANGLA
+MATUWID NA ISI
+MALINI NA LOO
+MARANGA NA LOO
+
+Two supplied short pieces:
+A
+NA
+
+Two supplied blank pieces:
+[BLANK]
+[BLANK]
+
+One ordinary pencil.
+One ordinary cue slip.
+One ordinary observer timer, optional.
+
+Cue slip front:
+“Some pieces may be missing an ending. Make any silent arrangement. There is no correct answer. Use blanks only if needed.”
+
+Cue slip back:
+“Point to the part you are least sure about.”
+
+Setup:
+1. Place the ten supplied game pieces face up in a loose random cluster.
+2. Give the builder the pencil and cue slip.
+3. The observer does not speak.
+4. The observer starts the timer when the builder receives the cue slip.
+
+Procedure:
+1. The builder has 4 minutes to arrange the pieces silently.
+2. The builder may move, rotate, reverse, stack, overlap, cover, separate, leave gaps, or write on blanks.
+3. If the builder speaks, the observer points to the cue slip and remains silent.
+4. At 4 minutes, the observer shows the back of the cue slip.
+5. The builder points to the part they are least sure about.
+6. Total elapsed time: no more than 5 minutes.
+
+Removed for this test:
+No scoring.
+No win condition.
+No turn order.
+No translation.
+No spoken explanation.
+No additional pieces.
+No cultural framing.
+No authoritative language rule.
+
+OBSERVER CHECKLIST
+Record exactly the following. Do not interpret aloud.
+
+1. Time of first touch.
+2. First piece touched.
+3. First physical operation used:
+   - adjacency
+   - distance
+   - orientation
+   - reversal
+   - stacking
+   - overlap
+   - covering
+   - writing
+   - silence/no movement
+
+4. Visible grouping anchors used, if any:
+   - SARILI
+   - LOO
+   - ISI
+   - NA
+   - none
+   - other
+
+5. Use of short pieces:
+   - A ignored
+   - A used as bridge
+   - A used as separator
+   - A used as substitute
+   - NA ignored
+   - NA used as bridge
+   - NA placed next to a piece already containing NA
+   - other
+
+6. Orientation behavior:
+   - any piece rotated?
+   - any piece reversed?
+   - any piece placed face down?
+   - which pieces?
+
+7. Stacking behavior:
+   - any stack?
+   - which pieces?
+   - did stack imply choice, emphasis, hiding, or uncertainty?
+
+8. Overlap behavior:
+   - any overlap?
+   - which pieces?
+   - did overlap align visible text?
+
+9. Covering behavior:
+   - any piece covered?
+   - which piece covered which?
+
+10. Distance behavior:
+   - any deliberate gaps?
+   - between which pieces?
+   - did distance seem to mark uncertainty, pause, or rejection?
+
+11. Blank behavior:
+   - blanks ignored?
+   - blanks moved but not written?
+   - blanks written on?
+   - exact marks written?
+   - blank placed beside, under, over, or away from another piece?
+   - if marks resemble letters or words, label each as:
+     LEXICAL HYPOTHESIS — HUMAN REVIEW REQUIRED
+
+12. Omission behavior:
+   - did the builder point to a possible missing ending without writing?
+   - which piece?
+   - did the builder write a proposed restoration?
+   - which piece?
+
+13. Speech:
+   - time of first utterance, if any
+   - first five words spoken
+   - did the builder ask for meaning, translation, permission, or correctness?
+
+14. Pressure signs:
+   - freeze longer than 10 seconds?
+   - laughter?
+   - sigh?
+   - glance toward observer?
+   - request for approval?
+
+15. Final layout shape:
+   - line
+   - cluster
+   - grid
+   - pile
+   - separated pieces
+   - no clear arrangement
+
+16. Least-sure part:
+   - record the piece or blank pointed to when the back of the cue slip is shown.
+
+17. Non-mechanical claims:
+   - record any statement about Tagalog, Baybayin, culture, spirituality, history, or correct meaning as context only, not as mechanical evidence.
+
+COMPONENTS WITHHELD
+The following are withheld because the five-minute test does not require them:
+
+BAYANI PUSO
+BUNGA BUBO
+MALAYA PAG-IISI
+NASA MATUTO
+HABI DIWA
+BAGO SALI
+BAHALA NA
+
+SA
+NI
+
+KIKILO
+TITIGA
+BURA
+UTO
+TAE
+IHI
+BETLO
+BASTOS
+BASTOS
+
+Any extra blanks beyond the two supplied.
+Any score tokens.
+Any turn markers.
+Any rulebook.
+Any dictionary.
+Any translation key.
+Any final-consonant key.
+Any player aid.
+Any mats, bags, sleeves, boards, or card holders.
+Any spoken lecture.
+Any win condition.
+Any scoring rule.
+Any cultural, spiritual, historical, or authoritative framing.
+
+FIRST MECHANICAL FAILURE YOU EXPECT
+The builder will treat the fragments as requiring a correct linguistic, poetic, or culturally profound answer. The likely first failure is a legitimacy freeze: the builder pauses, asks whether the arrangement is “correct,” asks for translation, or waits for permission, instead of physically testing adjacency, omission, blanks, or connectors.
+
+ONE QUESTION THE PHYSICAL TEST CAN ANSWER BETTER THAN A MODEL
+After one small omission cue, does the human first respond to suspected missing endings by writing on or placing a [BLANK], or do they ignore blanks and arrange only by visible repeated strings?
