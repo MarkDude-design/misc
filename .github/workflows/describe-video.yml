@@ -1,0 +1,72 @@
+# describe-video — Route B (OpenRouter) button. v0.1
+#
+# SHIPS DARK: nothing runs until the repo secret OPENROUTER_API_KEY exists.
+# Activate (Mark-gated): repo Settings -> Secrets and variables -> Actions ->
+# New repository secret, name OPENROUTER_API_KEY, value = a CAPPED OpenRouter
+# key (the $10-key pattern) — never the main key. Then the Actions tab shows
+# this workflow's "Run workflow" button.
+#
+# Flow: fetch/trim clip -> Layer 1 extract (deterministic, no model) ->
+# Layer 2 describe (OpenRouter video_url) -> commit artifacts + receipts back
+# to video-descriptions/vdd/<name>/. Missing key = Layer 1 still publishes
+# with an honest-null receipt (failures are receipted data, not stops).
+name: describe-video (Route B)
+on:
+  workflow_dispatch:
+    inputs:
+      video_source:
+        description: 'https:// clip URL, or a path in this repo (e.g. clips/kanor-01.mp4)'
+        required: true
+      max_seconds:
+        description: 'Trim clip to N seconds (0 = full). Keeps base64 small.'
+        default: '90'
+      model:
+        description: 'Video-capable OpenRouter model'
+        default: 'qwen/qwen3-vl-plus'
+      out_name:
+        description: 'Output folder under video-descriptions/vdd/ (default: run-<number>)'
+        required: false
+permissions:
+  contents: write
+jobs:
+  describe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch clip
+        run: |
+          SRC="${{ inputs.video_source }}"
+          if [[ "$SRC" == http* ]]; then
+            curl -L --fail -o clip.mp4 "$SRC"
+          else
+            cp "$SRC" clip.mp4
+          fi
+          if [[ "${{ inputs.max_seconds }}" != "0" ]]; then
+            ffmpeg -y -i clip.mp4 -t "${{ inputs.max_seconds }}" -c:v libx264 -c:a copy clip-t.mp4 && mv clip-t.mp4 clip.mp4
+          fi
+          ffprobe -v error -show_entries format=duration -of csv=p=0 clip.mp4
+      - name: Layer 1 - extract (deterministic, zero model calls)
+        run: |
+          pip install --quiet opencv-python-headless mediapipe
+          python video-descriptions/extract.py clip.mp4 --out out/
+      - name: Layer 2 - describe (OpenRouter)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: python video-descriptions/describe_or.py --video clip.mp4 --model "${{ inputs.model }}" --out out/
+      - name: Publish artifacts + receipts
+        run: |
+          NAME="${{ inputs.out_name }}"
+          if [[ -z "$NAME" ]]; then NAME="run-${{ github.run_number }}"; fi
+          DEST="video-descriptions/vdd/$NAME"
+          mkdir -p "$DEST"
+          cp -r out/* "$DEST"/
+          printf '# VDD %s — Route B run %s\n\n- model: %s\n- source: %s\n- lanes: see meta.json + describe-receipt.json\n' \
+            "$NAME" "${{ github.run_number }}" "${{ inputs.model }}" "${{ inputs.video_source }}" > "$DEST/README.md"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DEST"
+          git commit -m "VDD $NAME: Route B run ${{ github.run_number }} (receipt)"
+          git push
