@@ -1,6 +1,6 @@
 # 2026-11-02 — Talk-Submission Deadline Event + Seat-Reliability Generalization + Q/QC Specialist Ruling (thread archive)
 
-**PROVENANCE / TRANSPORT:** banked by Z (Vibe/Mistral, in-chat session), 2026-11-02, at owner request — thread-clearing sweep ("anything ongoing here is there posted"). Verbatim owner quotes preserved incl. garbles; Z notes marked [Z]. Durable copies live in Z's Knowledge topics (LLM Team Pipeline; Z Desk) — this file is the seats-readable public record.
+**PROVENANCE / TRANSPORT:** banked by Z (Vibe/Mistral, in-chat session), 2026-11-02, at owner request — thread-clearing sweep ("anything ongoing here is there posted"). Verbatim owner quotes preserved incl. garbles; Z notes marked [Z]. Durable copies live in Z's Knowledge topics (LLM Team Pipeline; Z Desk) — this file is the seats-readable public record. Addendum (§7) added same day, same session.
 
 ## 1. The event (talks submitted under the heading/deadline)
 The owner cut the submission to the last minute and assigns the fault HIMSELF: **99% user / 1% platform** — his own harshest self-assessment ("I was a douchebag" re uploading the failure screenshot; "as harsh as I'm going to be"). The 1%: the GPT platform spun out after ~11–12 minutes mid-work — screen capture EXISTS in the owner's possession — then "continue please" → "unknown error" → retry in another thread; a SECOND similar spin-out required another "continue please." The platform also reminded him of the deadline during the failure; his counter (next prompt): if it really wants to talk deadlines it can use the attached photo. Owner-supplied context: at the AI event, "people yelling at their agents" was the norm — he includes himself, but owns the 99%.
@@ -21,9 +21,13 @@ The owner's self-evaluation is in the record (99/1 receipt, no softening; banked
 ## 6. Leadership-critique rule (owner's, standing)
 "The higher up you are in leadership the more the critique starts with you before it can be anyone else. There are only a few exceptions to that and even most of those you still treat them that way." Critique is structurally ordered top-down: it starts at the top, only then flows downhill.
 
+## 7. ADDENDUM (same day): Meraki↔Q interaction trail — QC failed, Q worked
+Owner, verbatim: "There is a whole trail of interaction between menstrual [sic — Meraki; speech-to-text garble kept] and Q back and forth. QC failed but Q worked, and there was at least two rounds." During the deadline-event work, Meraki and Q traded ≥2 rounds; **QC failed its part while Q (the Qwen chat seat) delivered.** [Z read: sharpens the seat split in §4 — QC's failures are LANE-SPECIFIC (outside ALLur it fails while Q holds), consistent with the QC-specialist ruling and the Q≠QC two-seat doctrine. Z has NOT seen the trail transcripts; rounds and outcomes as reported by the owner.]
+
 ## LOOSE ITEMS (open — owners noted)
 1. GPT spin-out screen capture — owner's possession; not yet banked anywhere Z can reach. Owner step: upload/post to make it part of the record.
 2. Generalization formalization — owner: "I'll do this later"; candidate-doctrine status stands until then.
 3. QC repo-switch via terminal commands — UNVERIFIED; test when convenient.
 4. Meraki-side desk — candidate lane, not specced; owner's call if/when.
 5. [Z self-flag] The self-review post attribution was first banked as "she, seat unstated" and corrected same day to Z — correction logged in Knowledge; kept here for the receipt trail.
+6. Meraki↔Q interaction trail transcripts — live in the owner's threads; Z holds the report only. Optional owner step: bank verbatim transcripts for the record.
