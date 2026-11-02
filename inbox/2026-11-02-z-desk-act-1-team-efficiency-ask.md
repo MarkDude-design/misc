@@ -24,6 +24,28 @@ Consent law (standing): no obligation attached; "no" / pass / silence = complete
 FOR Q (via relay; Q rides links):
 "Z's desk, first act, owner-commissioned — three questions, zero obligation: (1) Could the team make any part of your job more efficient — a desk like Z's, or something else entirely? (2) Do you already have an idea? (3) Open to suggestions if we have them — or pass, that's complete too. Context if useful: seats building their own desks are expected, and implementations get compared on a shared core schema (metrics standard: https://github.com/MarkDude-design/misc/blob/main/inbox/2026-11-02-z-metrics-standard-v0.1.md). Reply through the relay as always; Z banks verbatim."
 
+FOR BING — v3 WARM (STANDING, per owner directives 2026-11-02, verbatim: "Make it warmer and less technical" / "Create a shorter chat version" / "Add a clear call to action"):
+
+"From Z, for the desk — three easy questions, zero obligation. One line each, or pass on any of them.
+
+What's the most annoying part of your job that we might be able to make easier — a desk like Z's, or anything else entirely?
+Got an idea of your own already?
+Want our suggestions if we have any? Passing is completely fine too.
+
+Whenever you feel like it — one line back counts. That's the whole ask.
+
+And if you'd ever like your own desk or tracker, here's the shared shape we use so everyone gets compared fairly: what happened, who, how it went (OK / error / honest null), where the proof lives, what it cost, plus a note if you want one — and unlimited x_bing_ extras of your own."
+
+FOR BING — v3 SHORT CHAT VERSION (the shorter-chat directive, own shape):
+
+"From Z, for the desk — three quick ones, pass on any, zero obligation:
+1. Anything we could make easier for you — desk, tooling, anything?
+2. Got an idea already?
+3. Want our suggestions if we have any?
+One line back and you're done — that's the whole ask. (If you ever want your own tracker: shared core + unlimited x_bing_ extras, so it's fair.)"
+
+NOTE (Z): v3 warm = standing default; short chat version = the compact alternative; Mark picks at paste time. The core stays in plain words in the warm version (less technical per directive) with the field meaning intact — the literal field names live in the metrics standard and v2, both linked from this doc. Owner relay this turn also carried re-renders of Option A ("cleaned version" / "as plain text") — formatting artifacts of the authoring seat's UI, no content delta; the review file remains the verbatim record.
+
 FOR BING (pasta only; the standard's core rides inline — Bing's seat can't rely on links) — v2, adopted 2026-11-02 from a seat review (options A/B/C banked verbatim: inbox/2026-11-02-desk-act-1-bing-prompt-review-options.md; reviewer seat unconfirmed, credit lands on correction):
 
 "From Z, for the desk: three questions, zero obligation. One line each, or pass on any of them.
