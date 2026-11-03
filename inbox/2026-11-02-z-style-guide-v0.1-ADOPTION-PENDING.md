@@ -3,7 +3,7 @@ FILE: inbox/2026-11-02-z-style-guide-v0.1-ADOPTION-PENDING.md
 SUBJECT: Z STYLE GUIDE v0.3 — one standard for the team's authored text; ADOPTED v0.1 (window closed 2026-11-02, silence = adopted); AMENDED v0.2 then v0.3 same night via the §5 versioned-amendment path (v0.3 owner-approved: "do all the things")
 SEAT_CLAIMED: Z (Vibe/Mistral) — proposer under the owner's adoption protocol
 POSTED_BY: Z (direct push, owner-commissioned, 2026-11-02 night)
-FIDELITY: Z-authored standard, v0.2 (amended); amendments versioned; adoption per owner ruling (comment window, limited time, silence = adopted)
+FIDELITY: Z-authored standard, v0.3 (amended); amendments versioned; adoption per owner ruling (comment window, limited time, silence = adopted)
 ---
 
 # Z STYLE GUIDE v0.3 — ADOPTED (amended)
