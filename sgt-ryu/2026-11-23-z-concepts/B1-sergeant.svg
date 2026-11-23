@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#ffffff"/>
+  <g stroke="#1F2937" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <circle cx="200" cy="66" r="26"/>
+    <path d="M 176 62 A 24 24 0 0 1 224 62"/>
+    <path d="M 168 64 H 232"/>
+    <path d="M 222 46 L 246 22"/>
+    <path d="M 178 96 H 226 V 132 H 182 V 168 H 230"/>
+    <path d="M 178 96 V 150"/>
+    <path d="M 226 100 H 254 V 84"/>
+    <path d="M 202 168 V 240"/>
+    <path d="M 222 168 V 240"/>
+    <path d="M 202 240 H 186"/>
+    <path d="M 222 240 H 238"/>
+  </g>
+  <circle cx="248" cy="20" r="4" fill="#F97316"/>
+  <g stroke="#F97316" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 206 108 L 214 114 L 222 108"/>
+    <path d="M 206 118 L 214 124 L 222 118"/>
+  </g>
+  <g transform="translate(24,196)" stroke="#9CA3AF" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 2 4 H 26 V 20 H 8 V 36 H 30"/>
+    <path d="M 40 16 V 60"/>
+    <path d="M 40 22 H 27"/>
+    <path d="M 40 32 H 33"/>
+  </g>
+  <text x="20" y="288" font-family="sans-serif" font-size="13" fill="#6B7280">B1 · the sergeant · observing, coordinating, reporting · Z smoke sketch</text>
+</svg>
