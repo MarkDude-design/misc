@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#ffffff"/>
+  <g stroke="#1F2937" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M 20 150 H 56 V 118 H 92 V 150 H 128"/>
+    <path d="M 128 150 V 104 H 140"/>
+    <circle cx="166" cy="104" r="26"/>
+    <path d="M 166 130 V 160"/>
+    <path d="M 166 160 H 206 V 186 H 170 V 212 H 206"/>
+    <path d="M 206 212 V 250"/>
+  </g>
+  <g stroke="#F97316" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 206 222 H 224"/>
+    <path d="M 206 236 H 216"/>
+  </g>
+  <g fill="#F97316">
+    <circle cx="252" cy="240" r="5"/>
+    <circle cx="274" cy="248" r="4"/>
+    <circle cx="292" cy="258" r="3"/>
+  </g>
+  <g transform="translate(24,196)" stroke="#9CA3AF" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 2 4 H 26 V 20 H 8 V 36 H 30"/>
+    <path d="M 40 16 V 60"/>
+    <path d="M 40 22 H 27"/>
+    <path d="M 40 32 H 33"/>
+  </g>
+  <text x="20" y="288" font-family="sans-serif" font-size="13" fill="#6B7280">C1 · the relay · the wave passes through · Z smoke sketch</text>
+</svg>
